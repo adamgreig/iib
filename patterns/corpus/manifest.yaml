@@ -45,3 +45,7 @@ gs004:
 gsm001:
     path: rds/gray_scott_modulated_001.png
     source: Ready, Gray-Scott w/ noise modulation
+
+chessboard:
+    path: synthetic/chessboard.png
+    source: self-made
