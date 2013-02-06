@@ -25,7 +25,7 @@ def edge_stats(path, show_images=False):
 def main():
     with open("corpus/manifest.yaml") as f:
         manifest = yaml.load(f)
-    for img in manifest:
+    for img in sorted(manifest.keys()):
         path = "corpus/"+manifest[img]["path"]
         result = edge_stats(path)
         print("{0}: µ={1:.2f}, σ={2:.2f}".format(img, *result))

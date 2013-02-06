@@ -1,18 +1,34 @@
 giraffe001:
-    path: animals/nojhan_3492324872_cropped.jpg
+    path: animals/nojhan_3492324872_crop1.jpg
     source: http://www.flickr.com/photos/nojhan/3492324872/
 
 giraffe002:
+    path: animals/nojhan_3492324872_crop2.jpg
+    source: http://www.flickr.com/photos/nojhan/3492324872/
+
+giraffe003:
     path: animals/chrisandkylie_3369755157_crop1.jpg
     source: http://www.flickr.com/photos/chrisandkylie/3369755157
 
-giraffe003:
+giraffe004:
     path: animals/chrisandkylie_3369755157_crop2.jpg
     source: http://www.flickr.com/photos/chrisandkylie/3369755157
 
-giraffe004:
+giraffe005:
     path: animals/chrisandkylie_3369755157_crop3.jpg
     source: http://www.flickr.com/photos/chrisandkylie/3369755157
+
+owl001:
+    path: animals/41186811_N00_8445421941_crop1.jpg
+    source: http://www.flickr.com/photos/41186811@N00/8445421941
+
+owl002:
+    path: animals/41186811_N00_8445421941_crop2.jpg
+    source: http://www.flickr.com/photos/41186811@N00/8445421941
+
+owl003:
+    path: animals/41186811_N00_8445421941_crop3.jpg
+    source: http://www.flickr.com/photos/41186811@N00/8445421941
 
 turing001:
     path: rds/turing_001.png
