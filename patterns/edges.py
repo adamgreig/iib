@@ -18,7 +18,7 @@ def edge_stats(path, show_images=False):
         plt.show()
         plt.imshow(edges, cmap=plt.cm.Paired, interpolation='nearest')
         plt.show()
-    return (np.mean(stats), np.std(stats))
+    return (np.size(stats), np.mean(stats), np.std(stats))
 
 def main():
     with open("corpus/manifest.yaml") as f:
@@ -26,7 +26,7 @@ def main():
     for img in sorted(manifest.keys()):
         path = "corpus/"+manifest[img]["path"]
         result = edge_stats(path)
-        print("{0}: µ={1:.2f}, σ={2:.2f}".format(img, *result))
+        print("{0}: N={1}, µ={2:.2f}, σ={3:.2f}".format(img, *result))
 
 if __name__ == "__main__":
     main()
