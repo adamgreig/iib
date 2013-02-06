@@ -21,12 +21,17 @@ def edge_stats(path, show_images=False):
     return (np.size(stats), np.mean(stats), np.std(stats))
 
 def main():
+    results = [("File", "N", "  µ", "  σ"), ("----", "--", "-----", "-----")]
     with open("corpus/manifest.yaml") as f:
         manifest = yaml.load(f)
     for img in sorted(manifest.keys()):
         path = "corpus/"+manifest[img]["path"]
         result = edge_stats(path)
-        print("{0}: N={1}, µ={2:.2f}, σ={3:.2f}".format(img, *result))
+        result = "{0} {1} {2:.2f} {3:.2f}".format(img, *result)
+        results.append(result.split(" "))
+    widths = [max(map(len, col)) for col in zip(*results)]
+    for row in results:
+        print("  ".join((val.ljust(width) for val, width in zip(row, widths))))
 
 if __name__ == "__main__":
     main()
