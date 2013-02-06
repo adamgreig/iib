@@ -1,0 +1,47 @@
+giraffe001:
+    path: animals/nojhan_3492324872_cropped.jpg
+    source: http://www.flickr.com/photos/nojhan/3492324872/
+
+giraffe002:
+    path: animals/chrisandkylie_3369755157_crop1.jpg
+    source: http://www.flickr.com/photos/chrisandkylie/3369755157
+
+giraffe003:
+    path: animals/chrisandkylie_3369755157_crop2.jpg
+    source: http://www.flickr.com/photos/chrisandkylie/3369755157
+
+giraffe004:
+    path: animals/chrisandkylie_3369755157_crop3.jpg
+    source: http://www.flickr.com/photos/chrisandkylie/3369755157
+
+turing001:
+    path: rds/turing_001.png
+    source: Ready, Turing pattern
+
+turing002:
+    path: rds/turing_002.png
+    source: Ready, Turing pattern
+
+turing003:
+    path: rds/turing_003.png
+    source: Ready, Turing pattern
+
+gs001:
+    path: rds/gray_scott_001.png
+    source: Ready, inbuilt Gray-Scott
+
+gs002:
+    path: rds/gray_scott_002.png
+    source: Ready, inbuilt Gray-Scott
+
+gs003:
+    path: rds/gray_scott_003.png
+    source: Ready, inbuilt Gray-Scott
+
+gs004:
+    path: rds/gray_scott_004.png
+    source: Ready, inbuilt Gray-Scott
+
+gsm001:
+    path: rds/gray_scott_modulated_001.png
+    source: Ready, Gray-Scott w/ noise modulation
