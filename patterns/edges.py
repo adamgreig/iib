@@ -13,14 +13,12 @@ def edge_stats(path, show_images=False):
     stats = [s['Area'] for s in measure.regionprops(edges, properties=['Area'])]
     stats = np.array(stats)
     stats = stats[stats>3]
-    return (np.mean(stats), np.std(stats))
     if show_images:
         plt.imshow(im, interpolation="nearest")
         plt.show()
-        edges = morphology.label(edges, neighbors=8)
-        stats = [s['Area'] for s in measure.regionprops(edges, properties=['Area'])]
         plt.imshow(edges, cmap=plt.cm.Paired, interpolation='nearest')
         plt.show()
+    return (np.mean(stats), np.std(stats))
 
 def main():
     with open("corpus/manifest.yaml") as f:

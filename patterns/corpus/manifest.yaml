@@ -30,6 +30,42 @@ owl003:
     path: animals/41186811_N00_8445421941_crop3.jpg
     source: http://www.flickr.com/photos/41186811@N00/8445421941
 
+leopard001:
+    path: animals/arnolouise_1746854414_crop1.jpg
+    source: http://www.flickr.com/photos/arnolouise/1746854414
+
+leopard002:
+    path: animals/arnolouise_1746854414_crop2.jpg
+    source: http://www.flickr.com/photos/arnolouise/1746854414
+
+leopard003:
+    path: animals/arnolouise_1746854414_crop3.jpg
+    source: http://www.flickr.com/photos/arnolouise/1746854414
+
+jaguar001:
+    path: animals/kerstingu_7957673398_crop1.jpg
+    source: http://www.flickr.com/photos/kerstingu/7957673398
+
+jaguar002:
+    path: animals/kerstingu_7957673398_crop2.jpg
+    source: http://www.flickr.com/photos/kerstingu/7957673398
+
+jaguar003:
+    path: animals/kerstingu_7957673398_crop3.jpg
+    source: http://www.flickr.com/photos/kerstingu/7957673398
+
+tiger001:
+    path: animals/fpat_4242800364_crop1.jpg
+    source: http://www.flickr.com/photos/fpat/4242800364
+
+tiger002:
+    path: animals/fpat_4242800364_crop2.jpg
+    source: http://www.flickr.com/photos/fpat/4242800364
+
+jaguar004:
+    path: animals/kerstingu_7957673398_crop4.jpg
+    source: http://www.flickr.com/photos/kerstingu/7957673398
+
 turing001:
     path: rds/turing_001.png
     source: Ready, Turing pattern
