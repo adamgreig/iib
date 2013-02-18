@@ -17,6 +17,8 @@ def edge_stats(path, show_images=False):
         plt.show()
         plt.imshow(edges, cmap=plt.cm.Paired, interpolation='nearest')
         plt.show()
+    if not stats.size:
+        return [0, 0, 0]
     return [np.size(stats), np.mean(stats), np.std(stats)]
 
 def blob_stats(path, show_images=False):
@@ -28,6 +30,9 @@ def blob_stats(path, show_images=False):
     for idx in range(4):
         dist = np.ceil(8.0 / (3.0 * (idx+1)))
         maxms = feature.peak_local_max(pyramid[idx], min_distance=dist)
+        if maxms == []:
+            num_blobs.append(0)
+            continue
         num_blobs.append(maxms.shape[0])
         if show_images:
             plt.subplot(4, 2, 2*idx + 1)
@@ -41,16 +46,18 @@ def blob_stats(path, show_images=False):
     return num_blobs
 
 def main():
-    results = []
     with open("corpus/manifest.yaml") as f:
         manifest = yaml.load(f)
-    for img in sorted(manifest.keys()):
-        path = "corpus/"+manifest[img]["path"]
-        result = edge_stats(path) + blob_stats(path)
-        results.append(result)
-    results = np.array(results)
-    np.save("corpus/features.npy", results)
-    print("Features saved to corpus/feature.npy")
+    for cls in ("patterns", "nopatterns"):
+        results = []
+        for img in sorted(manifest[cls].keys()):
+            path = "corpus/"+manifest[cls][img]["path"]
+            result = edge_stats(path) + blob_stats(path)
+            results.append(result)
+        results = np.array(results)
+        outpath = "corpus/{0}.npy".format(cls)
+        np.save(outpath, results)
+        print("Feature vectors saved to {0}".format(outpath))
 
 if __name__ == "__main__":
     main()

@@ -1,103 +1,150 @@
-giraffe001:
-    path: animals/nojhan_3492324872_crop1.jpg
-    source: http://www.flickr.com/photos/nojhan/3492324872/
+patterns:
+    giraffe001:
+        path: animals/nojhan_3492324872_crop1.jpg
+        source: http://www.flickr.com/photos/nojhan/3492324872/
 
-giraffe002:
-    path: animals/nojhan_3492324872_crop2.jpg
-    source: http://www.flickr.com/photos/nojhan/3492324872/
+    giraffe002:
+        path: animals/nojhan_3492324872_crop2.jpg
+        source: http://www.flickr.com/photos/nojhan/3492324872/
 
-giraffe003:
-    path: animals/chrisandkylie_3369755157_crop1.jpg
-    source: http://www.flickr.com/photos/chrisandkylie/3369755157
+    giraffe003:
+        path: animals/chrisandkylie_3369755157_crop1.jpg
+        source: http://www.flickr.com/photos/chrisandkylie/3369755157
 
-giraffe004:
-    path: animals/chrisandkylie_3369755157_crop2.jpg
-    source: http://www.flickr.com/photos/chrisandkylie/3369755157
+    giraffe004:
+        path: animals/chrisandkylie_3369755157_crop2.jpg
+        source: http://www.flickr.com/photos/chrisandkylie/3369755157
 
-giraffe005:
-    path: animals/chrisandkylie_3369755157_crop3.jpg
-    source: http://www.flickr.com/photos/chrisandkylie/3369755157
+    giraffe005:
+        path: animals/chrisandkylie_3369755157_crop3.jpg
+        source: http://www.flickr.com/photos/chrisandkylie/3369755157
 
-owl001:
-    path: animals/41186811_N00_8445421941_crop1.jpg
-    source: http://www.flickr.com/photos/41186811@N00/8445421941
+    owl001:
+        path: animals/41186811_N00_8445421941_crop1.jpg
+        source: http://www.flickr.com/photos/41186811@N00/8445421941
 
-owl002:
-    path: animals/41186811_N00_8445421941_crop2.jpg
-    source: http://www.flickr.com/photos/41186811@N00/8445421941
+    owl002:
+        path: animals/41186811_N00_8445421941_crop2.jpg
+        source: http://www.flickr.com/photos/41186811@N00/8445421941
 
-owl003:
-    path: animals/41186811_N00_8445421941_crop3.jpg
-    source: http://www.flickr.com/photos/41186811@N00/8445421941
+    owl003:
+        path: animals/41186811_N00_8445421941_crop3.jpg
+        source: http://www.flickr.com/photos/41186811@N00/8445421941
 
-leopard001:
-    path: animals/arnolouise_1746854414_crop1.jpg
-    source: http://www.flickr.com/photos/arnolouise/1746854414
+    leopard001:
+        path: animals/arnolouise_1746854414_crop1.jpg
+        source: http://www.flickr.com/photos/arnolouise/1746854414
 
-leopard002:
-    path: animals/arnolouise_1746854414_crop2.jpg
-    source: http://www.flickr.com/photos/arnolouise/1746854414
+    leopard002:
+        path: animals/arnolouise_1746854414_crop2.jpg
+        source: http://www.flickr.com/photos/arnolouise/1746854414
 
-leopard003:
-    path: animals/arnolouise_1746854414_crop3.jpg
-    source: http://www.flickr.com/photos/arnolouise/1746854414
+    leopard003:
+        path: animals/arnolouise_1746854414_crop3.jpg
+        source: http://www.flickr.com/photos/arnolouise/1746854414
 
-jaguar001:
-    path: animals/kerstingu_7957673398_crop1.jpg
-    source: http://www.flickr.com/photos/kerstingu/7957673398
+    jaguar001:
+        path: animals/kerstingu_7957673398_crop1.jpg
+        source: http://www.flickr.com/photos/kerstingu/7957673398
 
-jaguar002:
-    path: animals/kerstingu_7957673398_crop2.jpg
-    source: http://www.flickr.com/photos/kerstingu/7957673398
+    jaguar002:
+        path: animals/kerstingu_7957673398_crop2.jpg
+        source: http://www.flickr.com/photos/kerstingu/7957673398
 
-jaguar003:
-    path: animals/kerstingu_7957673398_crop3.jpg
-    source: http://www.flickr.com/photos/kerstingu/7957673398
+    jaguar003:
+        path: animals/kerstingu_7957673398_crop3.jpg
+        source: http://www.flickr.com/photos/kerstingu/7957673398
 
-tiger001:
-    path: animals/fpat_4242800364_crop1.jpg
-    source: http://www.flickr.com/photos/fpat/4242800364
+    tiger001:
+        path: animals/fpat_4242800364_crop1.jpg
+        source: http://www.flickr.com/photos/fpat/4242800364
 
-tiger002:
-    path: animals/fpat_4242800364_crop2.jpg
-    source: http://www.flickr.com/photos/fpat/4242800364
+    tiger002:
+        path: animals/fpat_4242800364_crop2.jpg
+        source: http://www.flickr.com/photos/fpat/4242800364
 
-jaguar004:
-    path: animals/kerstingu_7957673398_crop4.jpg
-    source: http://www.flickr.com/photos/kerstingu/7957673398
+    jaguar004:
+        path: animals/kerstingu_7957673398_crop4.jpg
+        source: http://www.flickr.com/photos/kerstingu/7957673398
 
-turing001:
-    path: rds/turing_001.png
-    source: Ready, Turing pattern
+    turing001:
+        path: rds/turing_001.png
+        source: Ready, Turing pattern
 
-turing002:
-    path: rds/turing_002.png
-    source: Ready, Turing pattern
+    turing002:
+        path: rds/turing_002.png
+        source: Ready, Turing pattern
 
-turing003:
-    path: rds/turing_003.png
-    source: Ready, Turing pattern
+    turing003:
+        path: rds/turing_003.png
+        source: Ready, Turing pattern
 
-gs001:
-    path: rds/gray_scott_001.png
-    source: Ready, inbuilt Gray-Scott
+    gs001:
+        path: rds/gray_scott_001.png
+        source: Ready, inbuilt Gray-Scott
 
-gs002:
-    path: rds/gray_scott_002.png
-    source: Ready, inbuilt Gray-Scott
+    gs002:
+        path: rds/gray_scott_002.png
+        source: Ready, inbuilt Gray-Scott
 
-gs003:
-    path: rds/gray_scott_003.png
-    source: Ready, inbuilt Gray-Scott
+    gs003:
+        path: rds/gray_scott_003.png
+        source: Ready, inbuilt Gray-Scott
 
-gs004:
-    path: rds/gray_scott_004.png
-    source: Ready, inbuilt Gray-Scott
+    gs004:
+        path: rds/gray_scott_004.png
+        source: Ready, inbuilt Gray-Scott
 
-gsm001:
-    path: rds/gray_scott_modulated_001.png
-    source: Ready, Gray-Scott w/ noise modulation
+    gsm001:
+        path: rds/gray_scott_modulated_001.png
+        source: Ready, Gray-Scott w/ noise modulation
 
-chessboard:
-    path: synthetic/chessboard.png
-    source: self-made
+    chessboard:
+        path: synthetic/chessboard.png
+        source: self made in GIMP
+
+nopatterns:
+    a:
+        path: nopattern/a.png
+        source: self made in GIMP
+        description: The letter A
+
+    blank:
+        path: nopattern/blank.png
+        source: self made in GIMP
+        description: Blank white grid
+
+    diffraction001:
+        path: nopattern/diffraction001.png
+        source: self made in GIMP
+        description: A diffraction pattern
+
+    jigsaw001:
+        path: nopattern/jigsaw001.png
+        source: self made in GIMP
+        description: A simple 3x3 jigsaw pattern
+
+    maze001:
+        path: nopattern/maze001.png
+        source: self made in GIMP
+        description: A maze generated using Prim's algorithm
+
+    noise001:
+        path: nopattern/noise001.png
+        source: self made in GIMP
+        description: Random RGB noise for each pixel
+
+    noise002:
+        path: nopattern/noise002.png
+        source: self made in GIMP
+        description: Random cloud pattern
+
+    noise003:
+        path: nopattern/noise003.png
+        source: self made in GIMP
+        description: Random plasma pattern
+
+    supernova001:
+        path: nopattern/supernova001.png
+        source: self made in GIMP
+        description: A supernova exploding
