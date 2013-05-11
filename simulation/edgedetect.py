@@ -23,7 +23,7 @@ image = np.empty(512*512*4, np.uint8)
 
 kernel = scipy.stats.norm(scale=0.8).pdf(range(4)).astype(np.float32)
 h2r = colorsys.hsv_to_rgb
-colour_lut = [h2r((1.0-(x/255.0)) * 2.0/3.0, 1.0, 1.0) for x in xrange(256)]
+colour_lut = [h2r((1.0-(x/255.0)) * 2.0/3.0, 1.0, 1.0) for x in range(256)]
 colour_lut = np.array(colour_lut, np.float32).reshape(256*3)
 
 # Set up OpenCL buffers for the data
@@ -48,7 +48,7 @@ program = cl.Program(ctx, progstr).build()
 
 # Run the simulation
 iterations = 100
-for iteration in xrange(iterations):
+for iteration in range(iterations):
     program.cell(queue, (512, 512), None, light_buf, sigs_in_buf, sigs_out_buf, output_buf)
     program.diffuse(queue, (512, 512), (256, 1), sigs_out_buf, sigs_in_buf)
     program.diffuse(queue, (512, 512), (1, 256), sigs_in_buf, sigs_out_buf)
