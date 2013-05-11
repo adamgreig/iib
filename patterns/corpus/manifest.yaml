@@ -149,6 +149,7 @@ nopatterns:
         source: self made in GIMP
         description: A supernova exploding
 
+validation:
     validate001:
         path: validation/leopard001.jpg
 
