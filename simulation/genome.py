@@ -1,7 +1,7 @@
 from collections import namedtuple
 from string import Template
 
-genome_cl = """//CL//
+genome_cl_str = """//CL//
 // A slightly leaky activation function that saturates at about x=1.0
 #define activation(x) native_recip(1.0f + native_exp(4.0f - 10.0f * x))
 
@@ -23,93 +23,42 @@ __kernel void genome(__global float* sigs_in, __global float* sigs_out)
 """
 
 Gene = namedtuple('Gene', 'reg sig_in rbs sig_out deg')
+signals = [str(i) for i in range(10)] + [chr(c) for c in range(65, 71)]
 
-class Genome:
-    signals = [str(i) for i in range(10)] + [chr(c) for c in range(65, 71)]
+def parsegenes(genestr):
+    genes = []
+    for g in [genestr[i:i+5] for i in range(0, len(genestr), 5)]:
+        genes.append(Gene(g[0], g[1], int(g[2]), g[3], int(g[4])))
+    return genes
 
-    def __init__(self, genes):
-        self.genestr = genes
-        self.parsegenes(genes)
+def degcode(genes, signal):
+    rbs_deg = [(g.rbs, g.deg) for g in genes if g.sig_out == signal]
+    rbs_total = float(sum(w[0] for w in rbs_deg))
+    rbs_total = 1 if rbs_total == 0 else rbs_total
+    deg_avg = sum((w[0]/rbs_total) * w[1] for w in rbs_deg) / 10.0
+    if deg_avg == 0.0:
+        return ""
+    factor = 1.0 - deg_avg
+    return "sigs.s{sig} *= {factor}f;".format(sig=signal, factor=factor)
 
-    def parsegenes(self, genestr):
-        self.genes = []
-        for gene in [genestr[i:i+5] for i in range(0, len(genestr), 5)]:
-            self.genes.append(Gene(gene[0], gene[1], int(gene[2]), gene[3],
-                               int(gene[4])))
-
-    def __str__(self):
-        return self.genestr
-
-    def degcode(self, signal):
-        rbs_deg = [(g.rbs, g.deg) for g in self.genes if g.sig_out == signal]
-        rbs_total = float(sum(w[0] for w in rbs_deg))
-        rbs_total = 1 if rbs_total == 0 else rbs_total
-        deg_avg = sum((w[0]/rbs_total) * w[1] for w in rbs_deg) / 10.0
-        if deg_avg == 0.0:
-            return ""
-        factor = 1.0 - deg_avg
-        return "sigs.s{sig} *= {factor}f;".format(sig=signal, factor=factor)
-
-    def prodcode(self, gene):
-        if gene.rbs == 0:
-            return ""
-        act = "activation(sigs.s{sig})".format(sig=gene.sig_in)
-        if gene.reg == '-':
-            act = "(1.0f - {act})".format(act=act)
-        amt = "{act} * {rbs}f".format(act=act, rbs=0.1*gene.rbs)
-        return "sigs.s{out} += {amt};".format(out=gene.sig_out, amt=amt)
+def prodcode(gene):
+    if gene.rbs == 0:
+        return ""
+    act = "activation(sigs.s{sig})".format(sig=gene.sig_in)
+    if gene.reg == '-':
+        act = "(1.0f - {act})".format(act=act)
+    amt = "{act} * {rbs:0.1f}f".format(act=act, rbs=0.1*gene.rbs)
+    return "sigs.s{out} += {amt};".format(out=gene.sig_out, amt=amt)
     
-    def export_cl(self):
-        degregation = "\n    ".join([self.degcode(s) for s in self.signals])
-        production = "\n    ".join([self.prodcode(g) for g in self.genes])
-        progstr = Template(genome_cl).substitute(
-            degregation=degregation, production=production)
-        return progstr
+def genome_cl(genestr):
+    genes = parsegenes(genestr)
+    degregation = "\n    ".join([degcode(genes, s) for s in signals])
+    production = "\n    ".join([prodcode(g) for g in genes])
+    progstr = Template(genome_cl_str).substitute(
+        degregation=degregation, production=production)
+    return progstr
 
 if __name__ == "__main__":
-    import numpy as np
-    import pyopencl as cl
-    def run_one_cell(gstr):
-        pass
-    prey_growth = "6"
-    predation   = "5"
-    predator_growth = "1"
-    predator_death  = "1"
-    gstr = "+0{0}0{1}+0{2}1{3}-1{1}0{1}".format(prey_growth, predation,
-                                              predator_growth, predator_death)
-    g = Genome(gstr)
-    print("OpenCL code for 'genome {0}':".format(gstr))
-    print(g.export_cl())
-    print()
-    ctx = cl.create_some_context()
-    queue = cl.CommandQueue(ctx)
-    mf = cl.mem_flags
-    sigs_a = np.ones(512*512*16, np.float32)
-    sigs_a[0] = 0.8
-    sigs_a[1] = 0.4
-    sigs_b = np.zeros(512*512*16, np.float32)
-    flags = mf.READ_WRITE | mf.COPY_HOST_PTR
-    sigs_a_buf = cl.Buffer(ctx, flags, hostbuf=sigs_a)
-    sigs_b_buf = cl.Buffer(ctx, flags, hostbuf=sigs_b)
-    program = cl.Program(ctx, g.export_cl()).build()
-    trace_a = np.empty(50, np.float32)
-    trace_b = np.empty(50, np.float32)
-    for iteration in range(50):
-        program.genome(queue, (512, 512), None, sigs_a_buf, sigs_b_buf)
-        sigs_a_buf, sigs_b_buf = sigs_b_buf, sigs_a_buf
-        if iteration % 1 == 0:
-            cl.enqueue_copy(queue, sigs_b, sigs_b_buf).wait()
-            x = y = 0
-            position = (y*512 + x)*16
-            signals = ", ".join(str(s) for s in sigs_b[position:position+16])
-            print("({0},{1}): [{2}]".format(x, y, signals))
-            trace_a[iteration] = sigs_b[position]
-            trace_b[iteration] = sigs_b[position+1]
-    import matplotlib.pyplot as plt
-    plt.plot(trace_a, label="Signal 0")
-    plt.plot(trace_b, label="Signal 1")
-    plt.legend()
-    plt.xlabel("Iteration")
-    plt.ylabel("Concentration")
-    plt.title("Single Cell Genome Run: " + gstr)
-    plt.show()
+    genestr = "+0605+0111-1505"
+    print("Genome:", genestr)
+    print(genome_cl(genestr))

@@ -2,7 +2,7 @@ import scipy.stats
 import numpy as np
 from string import Template
 
-diffusion_cl = """//CL//
+diffusion_cl_str = """//CL//
 #define KERNEL_N   ( $kerneln )
 __constant float16 conv_kernel[KERNEL_N + 1] = { $kernel };
 
@@ -98,15 +98,15 @@ def convolution_cl(kernel_n):
                    abs(i - kernel_n), i))
     return '\n    '.join(out)
 
-def generate_cl(kernel_sigmas):
+def diffusion_cl(kernel_sigmas):
     kernels, kernel_n = sigmas_to_kernels(kernel_sigmas)
     kernel = kernels_to_cl(kernels, kernel_n)
     convolution = convolution_cl(kernel_n)
-    progstr = Template(diffusion_cl).substitute(
+    progstr = Template(diffusion_cl_str).substitute(
         kerneln=kernel_n, kernel=kernel, convolution=convolution)
     return progstr
 
 if __name__ == "__main__":
     sigmas = [0.8, 1.0, 1.2, 1.5, 2.0, 2.0, 5.0, 5.0] * 2
     print("Sigmas:", sigmas)
-    print(generate_cl(sigmas))
+    print(diffusion_cl(sigmas))
