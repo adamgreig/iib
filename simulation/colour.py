@@ -5,12 +5,13 @@ from string import Template
 colour_cl_str = """//CL//
 __constant float colour_lut[768] = { $colourlut };
 
-__kernel void colour(__global float* input, __write_only image2d_t output)
+__kernel void colour(__global float* input, const uchar signal,
+                     __write_only image2d_t output)
 {
     uint x = get_global_id(0);
     uint y = get_global_id(1);
     int2 coord; coord.x = x; coord.y = y;
-    uint idx = (uint)(clamp(input[y*512 + x], 0.0f, 1.0f) * 255.0f);
+    uint idx = (uint)(clamp(input[(y*512+x)*16+signal], 0.0f, 1.0f) * 255.0f);
     float4 colour;
     colour.x = colour_lut[idx * 3    ];
     colour.y = colour_lut[idx * 3 + 1];

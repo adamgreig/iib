@@ -4,20 +4,23 @@ from string import Template
 
 diffusion_cl_str = """//CL//
 #define KERNEL_N   ( $kerneln )
+#define WG_SIZE    ( $wgsize  )
 __constant float16 conv_kernel[KERNEL_N + 1] = { $kernel };
 
-__kernel void diffuse(__global float* sigs_in, __global float* sigs_out)
+__kernel void diffusion(__global float* sigs_in, __global float* sigs_out)
 {
     __private ushort lidx, wuidx;
     __local ushort wgidx, wgsize, gsize, stepsize;
     __private ushort gcol = get_global_id(0);
     __private ushort grow = get_global_id(1);
-    __local ushort wgwidth = get_local_size(0);
-    __local ushort wgheight = get_local_size(1);
-    __local ushort gwidth = get_global_size(0);
-    __local ushort gheight = get_global_size(1);
+    __local ushort wgwidth, wgheight, gwidth, gheight;
     __private ushort gpos = grow * gwidth + gcol;
     __private float16 result = (float16)(0.0f);
+
+    wgwidth = get_local_size(0);
+    wgheight = get_local_size(1);
+    gwidth = get_global_size(0);
+    gheight = get_global_size(1);
 
     // Set up variables to allow for tall/wide diffusion
     if(wgwidth == 1) {
@@ -39,7 +42,7 @@ __kernel void diffuse(__global float* sigs_in, __global float* sigs_out)
     }
 
     // Space to store the entire workgroup's input plus an apron to either side
-    __local float16 wg_sigs[wgsize + 2*KERNEL_N];
+    __local float16 wg_sigs[WG_SIZE + 2*KERNEL_N];
 
     // Copy this workitem's memory
     wg_sigs[lidx + KERNEL_N] = vload16(gpos, sigs_in);
@@ -98,12 +101,12 @@ def convolution_cl(kernel_n):
                    abs(i - kernel_n), i))
     return '\n    '.join(out)
 
-def diffusion_cl(kernel_sigmas):
+def diffusion_cl(kernel_sigmas, wg_size):
     kernels, kernel_n = sigmas_to_kernels(kernel_sigmas)
     kernel = kernels_to_cl(kernels, kernel_n)
     convolution = convolution_cl(kernel_n)
-    return Template(diffusion_cl_str).substitute(
-        kerneln=kernel_n, kernel=kernel, convolution=convolution)
+    return Template(diffusion_cl_str).substitute(kerneln=kernel_n,
+        wgsize=wg_size, kernel=kernel, convolution=convolution)
 
 if __name__ == "__main__":
     sigmas = [0.8, 1.0, 1.2, 1.5, 2.0, 2.0, 5.0, 5.0] * 2
