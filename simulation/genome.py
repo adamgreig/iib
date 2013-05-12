@@ -23,7 +23,6 @@ __kernel void genome(__global float* sigs_in, __global float* sigs_out)
 """
 
 Gene = namedtuple('Gene', 'reg sig_in rbs sig_out deg')
-signals = [str(i) for i in range(10)] + [chr(c) for c in range(65, 71)]
 
 def parsegenes(genestr):
     genes = []
@@ -52,13 +51,13 @@ def prodcode(gene):
     
 def genome_cl(genestr):
     genes = parsegenes(genestr)
+    signals = [str(i) for i in range(10)] + [chr(c) for c in range(65, 71)]
     degregation = "\n    ".join([degcode(genes, s) for s in signals])
     production = "\n    ".join([prodcode(g) for g in genes])
-    progstr = Template(genome_cl_str).substitute(
+    return Template(genome_cl_str).substitute(
         degregation=degregation, production=production)
-    return progstr
 
 if __name__ == "__main__":
     genestr = "+0605+0111-1505"
-    print("Genome:", genestr)
+    print("// Genome:", genestr)
     print(genome_cl(genestr))

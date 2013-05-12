@@ -102,11 +102,10 @@ def diffusion_cl(kernel_sigmas):
     kernels, kernel_n = sigmas_to_kernels(kernel_sigmas)
     kernel = kernels_to_cl(kernels, kernel_n)
     convolution = convolution_cl(kernel_n)
-    progstr = Template(diffusion_cl_str).substitute(
+    return Template(diffusion_cl_str).substitute(
         kerneln=kernel_n, kernel=kernel, convolution=convolution)
-    return progstr
 
 if __name__ == "__main__":
     sigmas = [0.8, 1.0, 1.2, 1.5, 2.0, 2.0, 5.0, 5.0] * 2
-    print("Sigmas:", sigmas)
+    print("// Sigmas:", sigmas)
     print(diffusion_cl(sigmas))
