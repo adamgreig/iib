@@ -15,7 +15,7 @@ __kernel void diffusion(__global float* sigs_in, __global float* sigs_out)
     __private ushort gcol = get_global_id(0);
     __private ushort grow = get_global_id(1);
     __private float16 result = (float16)(0.0f);
-    __private ushort gpos;
+    __private uint gpos;
 
     wgwidth = get_local_size(0);
     wgheight = get_local_size(1);
@@ -52,7 +52,7 @@ __kernel void diffusion(__global float* sigs_in, __global float* sigs_out)
     if(lidx < KERNEL_N) {
         if(wuidx >= KERNEL_N) {
             // When not at the grid edge, copy the apron cells
-            wg_sigs[lidx] = vload16(gpos - KERNEL_N*stepsize, sigs_in);
+            wg_sigs[lidx] = vload16(gpos - KERNEL_N * stepsize, sigs_in);
         } else {
             // When at the grid edge, extend the edge values into the apron
             wg_sigs[lidx] = vload16(gpos - lidx*stepsize, sigs_in);
