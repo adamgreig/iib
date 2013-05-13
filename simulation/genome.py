@@ -4,21 +4,18 @@ from string import Template
 genome_cl_str = """//CL//
 // A slightly leaky activation function that saturates at about x=1.0
 #define activation(x) native_recip(1.0f + native_exp(4.0f - 10.0f * x))
+#define POS (get_global_id(1)*get_global_size(0) + get_global_id(0))
 
 __kernel void genome(__global float* sigs_in, __global float* sigs_out)
 {
-    uint col = get_global_id(0);
-    uint row = get_global_id(1);
-    uint position = row*get_global_size(0) + col;
-
-    __local float16 sigs;
-    sigs = vload16(position, sigs_in);
+    __private float16 sigs;
+    sigs = vload16(POS, sigs_in);
 
     $degregation
 
     $production
 
-    vstore16(sigs, position, sigs_out);
+    vstore16(sigs, POS, sigs_out);
 }
 """
 

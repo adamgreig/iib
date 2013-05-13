@@ -5,67 +5,67 @@ from string import Template
 diffusion_cl_str = """//CL//
 #define KERNEL_N   ( $kerneln )
 #define WG_SIZE    ( $wgsize  )
+#define GCOL (get_global_id(0))
+#define GROW (get_global_id(1))
+#define GWIDTH (get_global_size(0))
+#define GHEIGHT (get_global_size(1))
+#define WGWIDTH (get_local_size(0))
+#define WGHEIGHT (get_local_size(1))
+#define GPOS (GROW * GWIDTH + GCOL)
+#define LIDX (get_local_id(longdim))
+#define WUIDX (get_global_id(longdim))
 __constant float16 conv_kernel[KERNEL_N + 1] = { $kernel };
 
 __kernel void diffusion(__global float* sigs_in, __global float* sigs_out)
 {
-    __private ushort lidx, wuidx;
-    __local ushort wgidx, wgsize, wgwidth, wgheight;
-    __local ushort stepsize, gsize, gwidth, gheight;
-    __private ushort gcol = get_global_id(0);
-    __private ushort grow = get_global_id(1);
-    __private float16 result = (float16)(0.0f);
-    __private uint gpos;
-
-    wgwidth = get_local_size(0);
-    wgheight = get_local_size(1);
-    gwidth = get_global_size(0);
-    gheight = get_global_size(1);
-    gpos = grow * gwidth + gcol; 
+    __private uchar longdim;
+    __local ushort wgidx, wgsize, stepsize, gsize;
 
     // Set up variables to allow for tall/wide diffusion
-    if(wgwidth == 1) {
+    if(WGWIDTH == 1) {
         // Tall kernel
-        lidx = get_local_id(1); // Local index
-        wuidx = grow;           // Differs in each WU
-        wgidx = gcol;           // Same for whole WG
-        gsize = gheight;        // Relevant grid size
-        wgsize = wgheight;      // WG's larger dimension
+        longdim = 1;
+        wgidx = GCOL;           // Same for whole WG
+        gsize = GHEIGHT;        // Relevant grid size
+        wgsize = WGHEIGHT;      // WG's larger dimension
         stepsize = gsize;       // How spaced consecutive items are in sigs_in
     } else {
         // Wide kernel
-        lidx = get_local_id(0); // Local index
-        wuidx = gcol;           // Differs in each WU
-        wgidx = grow;           // Same for whole WG
-        gsize = gwidth;         // Relevant grid size
-        wgsize = wgwidth;       // WG's larger dimension
+        longdim = 0;
+        wgidx = GROW;           // Same for whole WG
+        gsize = GWIDTH;         // Relevant grid size
+        wgsize = WGWIDTH;       // WG's larger dimension
         stepsize = 1;           // How spaced consecutive items are in sigs_in
     }
+
+    // Space to store the entire workgroup's results during computation
+    __local float16 result[WG_SIZE];
+    result[LIDX] = (float16)(0.0f);
 
     // Space to store the entire workgroup's input plus an apron to either side
     __local float16 wg_sigs[WG_SIZE + 2*KERNEL_N];
 
     // Copy this workitem's memory
-    wg_sigs[lidx + KERNEL_N] = vload16(gpos, sigs_in);
+    wg_sigs[LIDX + KERNEL_N] = vload16(GPOS, sigs_in);
 
     // Edge workitems also copy apron
-    if(lidx < KERNEL_N) {
-        if(wuidx >= KERNEL_N) {
+    if(LIDX < KERNEL_N) {
+        if(WUIDX >= KERNEL_N) {
             // When not at the grid edge, copy the apron cells
-            wg_sigs[lidx] = vload16(gpos - KERNEL_N * stepsize, sigs_in);
+            wg_sigs[LIDX] = vload16(GPOS - KERNEL_N * stepsize, sigs_in);
         } else {
             // When at the grid edge, extend the edge values into the apron
-            wg_sigs[lidx] = vload16(gpos - lidx*stepsize, sigs_in);
+            wg_sigs[LIDX] = vload16(GPOS - LIDX*stepsize, sigs_in);
         }
-    } else if(lidx >= wgsize - KERNEL_N) {
-        if(wuidx < gsize - KERNEL_N) {
+    } else if(LIDX >= wgsize - KERNEL_N) {
+        if(WUIDX < gsize - KERNEL_N) {
             // When not at the grid edge, copy the apron cells
-            wg_sigs[lidx + 2*KERNEL_N] =
-                vload16(gpos + KERNEL_N*stepsize, sigs_in);
+            wg_sigs[LIDX + 2*KERNEL_N] =
+                vload16(GPOS + KERNEL_N*stepsize, sigs_in);
         } else {
             // When at the grid edge, extend the edge values into the apron
-            wg_sigs[lidx + 2*KERNEL_N] =
-                vload16(gpos + (KERNEL_N - wuidx)*stepsize, sigs_in);
+            wg_sigs[LIDX + 2*KERNEL_N] =
+                vload16(GPOS + (KERNEL_N - WUIDX)*stepsize, sigs_in);
         }
     }
 
@@ -76,7 +76,7 @@ __kernel void diffusion(__global float* sigs_in, __global float* sigs_out)
     $convolution
 
     // Store result
-    vstore16(result, gpos, sigs_out);
+    vstore16(result[LIDX], GPOS, sigs_out);
 }
 """
 
@@ -100,8 +100,9 @@ def kernels_to_cl(kernels, kernel_n):
 def convolution_cl(kernel_n):
     out = []
     for i in range(2*kernel_n + 1):
-        out.append("result += conv_kernel[{0}] * wg_sigs[lidx + {1}];".format(
-                   abs(i - kernel_n), i))
+        out.append(
+            "result[LIDX] += conv_kernel[{0}] * wg_sigs[LIDX + {1}];".format(
+            abs(i - kernel_n), i))
     return '\n    '.join(out)
 
 def diffusion_cl(kernel_sigmas, wg_size):

@@ -8,7 +8,7 @@ import pyopencl as cl
 from PIL import Image
 
 def main():
-    wg_size = 256
+    wg_size = 128
     g_size  = 512
 
     ctx = cl.create_some_context(interactive=True)
@@ -39,15 +39,15 @@ def main():
     progstr += colour.colour_cl()
     program = cl.Program(ctx, progstr).build()
 
-    dump_image(buf_a, 0)
+    #dump_image(buf_a, 0)
 
-    iterations = 100
+    iterations = 1000
     for iteration in range(iterations):
-        program.genome(queue, (g_size, g_size), None, buf_a, buf_b)
+        program.genome(queue, (g_size, g_size), None, buf_a, buf_b).wait()
         program.diffusion(queue, (g_size, g_size), (wg_size, 1), buf_b, buf_a)
-        program.diffusion(queue, (g_size, g_size), (1, wg_size), buf_a, buf_b)
+        program.diffusion(queue, (g_size, g_size), (1, wg_size), buf_a, buf_b).wait()
         buf_a, buf_b = buf_b, buf_a
-        dump_image(buf_a, iteration+1) 
+        #dump_image(buf_a, iteration+1) 
 
 
 if __name__ == "__main__":
