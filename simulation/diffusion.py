@@ -64,8 +64,9 @@ __kernel void diffusion(__global float* sigs_in, __global float* sigs_out)
                 vload16(GPOS + KERNEL_N*stepsize, sigs_in);
         } else {
             // When at the grid edge, extend the edge values into the apron
+            wg_sigs[LIDX + 2*KERNEL_N] = 0.0f;
             wg_sigs[LIDX + 2*KERNEL_N] =
-                vload16(GPOS + (KERNEL_N - WUIDX)*stepsize, sigs_in);
+                vload16(GPOS + (wgsize - LIDX - 1)*stepsize, sigs_in);
         }
     }
 
