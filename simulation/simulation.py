@@ -11,17 +11,12 @@ def main():
     wg_size = 256
     g_size  = 512
 
-    ctx = cl.create_some_context(interactive=False)
+    ctx = cl.create_some_context(interactive=True)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     
-    #sigs_a = np.ones(g_size*g_size*16, np.float32) * 0.5
-    #sigs_a = np.random.random(g_size*g_size*16).astype(np.float32) * 0.8
-    sigs_a = np.zeros(g_size*g_size*16, np.float32)
-    for r in range(200, 300):
-        sigs_a[r*512*16+200*16:r*512*16+300*16] = 1.0
+    sigs_a = np.random.random(g_size*g_size*16).astype(np.float32) * 0.8
     sigs_b = np.empty(g_size*g_size*16, np.float32)
-    sigs_b = sigs_a
     
     buf_a = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=sigs_a)
     buf_b = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=sigs_b)
@@ -37,11 +32,9 @@ def main():
         img = Image.fromarray(image.reshape((g_size, g_size, 4)))
         img.save("output/{0:05d}.png".format(iteration))
 
-    #test_genome = "+0605+0111-1505"
-    test_genome = "+0109"
-    test_sigmas = [5.0, 3.0] * 8
+    test_genome = "+0109+0312-1109"
+    test_sigmas = [0.1, 8.0] * 8
     progstr = genome.genome_cl(test_genome)
-    print(progstr)
     progstr += diffusion.diffusion_cl(test_sigmas, wg_size)
     progstr += colour.colour_cl()
     program = cl.Program(ctx, progstr).build()
@@ -50,8 +43,7 @@ def main():
 
     iterations = 100
     for iteration in range(iterations):
-        #program.genome(queue, (g_size, g_size), None, buf_a, buf_b)
-        buf_a, buf_b = buf_b, buf_a
+        program.genome(queue, (g_size, g_size), None, buf_a, buf_b)
         program.diffusion(queue, (g_size, g_size), (wg_size, 1), buf_b, buf_a)
         program.diffusion(queue, (g_size, g_size), (1, wg_size), buf_a, buf_b)
         buf_a, buf_b = buf_b, buf_a
