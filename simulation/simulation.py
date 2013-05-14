@@ -20,8 +20,8 @@ def main():
     sigs_a[206:306,206:306,0] = 1.0
     sigs_a[0:512  ,0:206  ,1] = 1.0
     sigs_a[0:512  ,307:512,1] = 1.0
-    sigs_a[0:206  ,206:307,1] = 1.0
-    sigs_a[307:512,206:307,1] = 1.0
+    sigs_a[0:206  ,0:512  ,1] = 1.0
+    sigs_a[307:512,0:512  ,1] = 1.0
     sigs_a = sigs_a.reshape(g_size * g_size * 16)
     sigs_b = np.empty(g_size*g_size*16, np.float32)
     
@@ -40,8 +40,8 @@ def main():
         img = Image.fromarray(image.reshape((g_size, g_size, 4)))
         img.save("output/{0}_{1:05d}.png".format(sig, iteration))
 
-    test_genome = "+0106-1609-0313"
-    test_sigmas = [1.0, 5.0] * 8
+    test_genome = "+0207-1609-0313"
+    test_sigmas = [0.9, 5.0] * 8
     progstr = genome.genome_cl(test_genome)
     progstr += diffusion.diffusion_cl(test_sigmas, wg_size)
     progstr += colour.colour_cl()
