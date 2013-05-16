@@ -87,8 +87,11 @@ def sigmas_to_kernels(sigmas):
     sigmas = np.asarray(sigmas)
     kernel_n = int(np.ceil(np.max(np.sqrt(2.0*(sigmas**2)*np.log(1000.0)))))
     kernels = []
-    for sigma in sigmas:
-        kernels.append(scipy.stats.norm(scale=sigma).pdf(range(kernel_n+1)))
+    for s in sigmas:
+        if s == 0.0:
+            kernels.append([1.0] + [0.0]*kernel_n)
+        else:
+            kernels.append(scipy.stats.norm(scale=s).pdf(range(kernel_n+1)))
     return kernels, kernel_n
 
 def kernels_to_cl(kernels, kernel_n):
