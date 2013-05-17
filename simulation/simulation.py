@@ -8,76 +8,105 @@ import pyopencl as cl
 from PIL import Image
 
 
-def main():
-    wg_size = 128
-    g_size = 512
-
+def run_simulation(config):
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
+    gs, wgs = config['grid_size'], config['wg_size']
+    sigs = np.empty((gs, gs, 16), np.float32)
 
-    #sigs_a = np.random.random(g_size*g_size*16).astype(np.float32) * 0.8
-    sigs_a = np.zeros((g_size, g_size, 16), np.float32)
-    #sigs_a[:, :, 10] = np.random.random((g_size, g_size)).astype(np.float32)
-    #sigs_a[:, :, 10] *= 0.2
-    sigs_a[:, :, 10] = np.random.randint(
-        0, 2, (g_size, g_size)).astype(np.float32)
-    #sigs_a[206:306, 206:306, 10] = 0.8
-    #sigs_a[0:512, 0:206, 1] = 1.0
-    #sigs_a[0:512, 307:512, 1] = 1.0
-    #sigs_a[0:206, 0:512, 1] = 1.0
-    #sigs_a[307:512, 0:512, 1] = 1.0
-    sigs_a[:, :, 1] = 0.5
-    sigs_a = sigs_a.reshape(g_size * g_size * 16)
-    sigs_b = np.empty(g_size*g_size*16, np.float32)
+    for idx, signal in enumerate(config['signals']):
+        if type(signal['initial']) == float:
+            sigs[:, :, idx] = signal['initial']
+        elif signal['initial'] == 'random_float':
+            sigs[:, :, idx] = np.random.random((gs, gs)).astype(np.float32)
+        elif signal['initial'] == 'random_binary':
+            t = np.float32
+            sigs[:, :, idx] = np.random.randint(0, 2, (gs, gs)).astype(t)
+        elif signal['initial'] == 'split':
+            sigs[0:(gs//2), :, idx] = 1.0
+            sigs[(gs//2):, :, idx] = 0.0
+        elif signal['initial'] == 'box':
+            m = gs//2
+            w = signal.get('box_width', 50)
+            sigs[:, :, idx] = 0.0
+            sigs[m-w:m+w, m-w:m+w, idx] = 1.0
+        if 'initial_scale' in signal:
+            sigs[:, :, idx] *= signal['initial_scale']
+        if 'initial_offset' in signal:
+            sigs[:, :, idx] += signal['initial_offset']
 
-    buf_a = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=sigs_a)
-    buf_b = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=sigs_b)
-
-    image = np.empty(512*512*4, np.uint8)
-    ifmt = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.UNORM_INT8)
-    ibuf = cl.Image(ctx, mf.WRITE_ONLY, ifmt, (g_size, g_size), None)
-
-    def dump_image(buf, sig, iteration):
-        bsig = str(chr(sig)).encode()
-        program.colour(queue, (g_size, g_size), None, buf, bsig, ibuf)
-        cl.enqueue_copy(
-            queue, image, ibuf, origin=(0, 0), region=(g_size, g_size)).wait()
-        img = Image.fromarray(image.reshape((g_size, g_size, 4)))
-        img.save("output/{0}_{1:05d}.png".format(sig, iteration))
-
-    def print_signals(buf, sigs):
-        cl.enqueue_copy(queue, sigs_a, buf).wait()
-        for sig in sigs:
-            print("Sig {0:X}:".format(sig), end=' ')
-            v = sigs_a.reshape(g_size, g_size, 16)[0, 0, sig]
-            print("{0:0.6f}".format(float(v)), end='\t')
-        print()
-
-    test_genome = "+A303+A513-12A2"
-    test_sigmas = [1.5, 3.0] * 4 + [0.0] * 8
-    progstr = genome.genome_cl(test_genome)
-    print(progstr)
-    progstr += diffusion.diffusion_cl(test_sigmas, wg_size)
-    progstr += colour.colour_cl()
+    sigmas = [s['diffusion'] for s in config['signals']]
+    progstr = genome.genome_cl(config['genome'])
+    progstr += diffusion.diffusion_cl(sigmas, wgs)
+    if config.get('dump_images'):
+        progstr += colour.colour_cl()
     program = cl.Program(ctx, progstr).build()
 
-    dump_image(buf_a,  0, 0)
-    dump_image(buf_a,  1, 0)
-    dump_image(buf_a, 10, 0)
-    print_signals(buf_a, (0, 1, 10))
+    sigs = sigs.reshape(gs*gs*16)
+    buf_a = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=sigs)
+    buf_b = cl.Buffer(ctx, mf.READ_WRITE, size=4*16*gs*gs)
 
-    iterations = 100
-    for iteration in range(iterations):
-        program.genome(queue, (g_size, g_size), None, buf_a, buf_b).wait()
-        program.diffusion(queue, (g_size, g_size), (wg_size, 1), buf_b, buf_a)
-        program.diffusion(queue, (g_size, g_size), (1, wg_size), buf_a, buf_b)
+    if config.get('dump_images'):
+        image = np.empty(gs*gs*4, np.uint8)
+        c_order, c_type = cl.channel_order.RGBA, cl.channel_type.UNORM_INT8
+        ifmt = cl.ImageFormat(c_order, c_type)
+        ibuf = cl.Image(ctx, mf.WRITE_ONLY, ifmt, (gs, gs), None)
+
+        def dump_image(sig, iteration):
+            bsig = str(chr(sig)).encode()
+            program.colour(queue, (gs, gs), None, buf_a, bsig, ibuf)
+            cl.enqueue_copy(
+                queue, image, ibuf, origin=(0, 0), region=(gs, gs)).wait()
+            img = Image.fromarray(image.reshape((gs, gs, 4)))
+            img.save("output/{0}_{1:05d}.png".format(sig, iteration))
+
+        for i in config.get('dump_images'):
+            dump_image(i, 0)
+
+    n_iters = config['iterations']
+    for iteration in range(n_iters):
+        program.genome(queue, (gs, gs), None, buf_a, buf_b)
+        program.diffusion(queue, (gs, gs), (wgs, 1), buf_b, buf_a)
+        program.diffusion(queue, (gs, gs), (1, wgs), buf_a, buf_b)
         buf_a, buf_b = buf_b, buf_a
-        dump_image(buf_a,  0, iteration+1)
-        dump_image(buf_a,  1, iteration+1)
-        dump_image(buf_a, 10, iteration+1)
-        print_signals(buf_a, (0, 1, 10))
 
+        if config.get('dump_images'):
+            for i in config.get('dump_images'):
+                dump_image(i, iteration+1)
+
+    cl.enqueue_copy(queue, sigs, buf_a).wait()
+    return sigs.reshape((gs, gs, 16))
+
+
+def main():
+    test_config = {
+        "grid_size": 512,
+        "wg_size": 128,
+        "iterations": 100,
+        "genome": "+A303+A513-12A2",
+        "signals": [
+            {"diffusion": 1.5, "initial": 0.0},
+            {"diffusion": 3.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": "random_binary"},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0},
+            {"diffusion": 0.0, "initial": 0.0}
+        ],
+        "dump_images": [0, 1, 10]
+    }
+
+    run_simulation(test_config)
 
 if __name__ == "__main__":
     main()
