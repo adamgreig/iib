@@ -53,7 +53,7 @@ def main():
     print_stats = True
     with open("corpus/manifest.yaml") as f:
         manifest = yaml.load(f)
-    for cls in ("patterns", "nopatterns"):
+    for cls in ("patterns", "nopatterns", "validation"):
         results = []
         dresults = [("File", "N", "  µ", "  σ", "B1", "B2", "B3", "B4"),
                     ("----", "--", "-----", "-----", "--", "--", "--", "--")]
