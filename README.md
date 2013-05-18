@@ -1,4 +1,6 @@
-Investigating Bacterial Colony Pattern Forming: IIB Project by Adam Greig
-=========================================================================
+Investigating Bacterial Colony Pattern Forming
+==============================================
 
-This repository contains software developed for my IIB project.
+by Adam Greig (SE)
+
+4th Year Undergraduate Project in Group F, 2012/2013
