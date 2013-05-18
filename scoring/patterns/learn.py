@@ -25,7 +25,7 @@ class gkde:
 
 class gmm:
     def train(self, positive, negative, validate):
-        self.clf = mixture.GMM(n_components=3, covariance_type='full',
+        self.clf = mixture.GMM(n_components=1, covariance_type='full',
                                n_iter=2000, n_init=500)
         self.clf.fit(positive)
 
@@ -84,8 +84,8 @@ def score(model):
     for cls in manifest.keys():
         for img in sorted(manifest[cls].keys()):
             path = "corpus/"+manifest[cls][img]["path"]
-            x = features.edge_stats(path) + features.blob_stats(path)
-            score = float(model.score(np.array(x).reshape((1, 7))))
+            x = features.stats(path)
+            score = float(model.score(np.array([x])))
             scores.append((score, path, cls))
     return scores
 
