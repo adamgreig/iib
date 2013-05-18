@@ -5,7 +5,7 @@ import numpy as np
 from skimage import transform
 
 
-def score(signals):
+def score(signals, only_highest_signal=False):
     with open(corpus_path("trained_models.p"), "rb") as f:
         models = pickle.load(f)
     x = []
@@ -16,10 +16,14 @@ def score(signals):
     scores = []
     x = np.array(x)
     for model in models:
-        scores.append(model.score(x))
-    return scores
+        score = model.score(x)
+        if only_highest_signal:
+            score = np.max(score)
+        scores.append(score)
+    return np.array(scores)
 
 
 if __name__ == "__main__":
     sigs = np.zeros((512, 512, 16), np.float32)
     print(score(sigs))
+    print(score(sigs, True))
