@@ -19,7 +19,7 @@ def gkde_train(positive, negative, validate):
 
 
 def gkde_score(model, x):
-    return np.log(model(x))[0]
+    return np.log(model(x))
 
 
 def gmm_train(positive, negative, validate):
@@ -30,7 +30,7 @@ def gmm_train(positive, negative, validate):
 
 
 def gmm_score(model, x):
-    return int(model.score(x)[0])
+    return model.score(x)
 
 
 def ocsvm_train(positive, negative, validate):
@@ -42,11 +42,10 @@ def ocsvm_train(positive, negative, validate):
 
 
 def ocsvm_score(model, x):
-    d = float(model[1].decision_function(model[0].transform(x))[0])
-    if d > 0:
-        return 0.0
-    return d * 100.0
-    float(model[1].predict(model[0].transform(x))[0])
+    d = model[1].decision_function(model[0].transform(x))
+    d[d > 0] = 0.0
+    d[d < 0] *= 100.0
+    return d
 
 
 def rf_train(positive, negative, validate):
@@ -57,7 +56,7 @@ def rf_train(positive, negative, validate):
 
 
 def rf_score(model, x):
-    return model.predict_log_proba(x)[0, 1]
+    return model.predict_log_proba(x)[:, 1]
 
 
 models = {
@@ -85,7 +84,7 @@ def learn(train_cb, score_cb, modelname):
         for img in sorted(manifest[cls].keys()):
             path = "corpus/"+manifest[cls][img]["path"]
             x = features.edge_stats(path) + features.blob_stats(path)
-            score = score_cb(model, np.array(x).reshape((1, 7)))
+            score = float(score_cb(model, np.array(x).reshape((1, 7))))
             scored_paths.append((score, path, cls))
 
     for idx, (score, path, cls) in enumerate(reversed(sorted(scored_paths))):
@@ -95,13 +94,14 @@ def learn(train_cb, score_cb, modelname):
         plt.imshow(img)
         plt.xticks([])
         plt.yticks([])
-        t = plt.title("{0:.0f}".format(score))
+        t = plt.title("{0:.5g}".format(score))
         for s in ("bottom", "top", "left", "right"):
             col = cls_lut.get(cls, 'k')
             ax.spines[s].set_color(col)
             t.set_color(col)
 
-    plt.suptitle("Scores for {0}".format(modelname))
+    plt.suptitle("Scores for {0} (blue=train, red=reject, green=validation)"
+                 .format(modelname))
     plt.show()
 
 
