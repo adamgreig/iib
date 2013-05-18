@@ -1,7 +1,9 @@
 import yaml
 import features
 import numpy as np
+import scipy.stats
 import matplotlib.pyplot as plt
+from sklearn import mixture
 from skimage import io
 
 
@@ -9,6 +11,31 @@ cls_lut = {
     "patterns": "b",
     "nopatterns": "r",
     "validation": "g"
+}
+
+
+def gkde_train(positive, negative, validate):
+    return scipy.stats.gaussian_kde(positive.T)
+
+
+def gkde_score(model, x):
+    return np.log(model(x))[0]
+
+
+def gmm_train(positive, negative, validate):
+    clf = mixture.GMM(n_components=3, covariance_type='full', n_iter=2000,
+                      n_init=500)
+    clf.fit(positive)
+    return clf
+
+
+def gmm_score(model, x):
+    return int(model.score(x)[0])
+
+
+models = {
+    "Gaussian Kernel Density Estimate": [gkde_train, gkde_score],
+    "Gaussian Mixture Model": [gmm_train, gmm_score]
 }
 
 
@@ -47,3 +74,19 @@ def learn(train_cb, score_cb, modelname):
 
     plt.suptitle("Scores for {0}".format(modelname))
     plt.show()
+
+
+def main():
+    print("Select model:")
+    for i, k in enumerate(models.keys()):
+        print("[{0}] {1}".format(i+1, k))
+    m = int(input("> ")) - 1
+    if not 0 <= m <= len(models.keys()):
+        print("Invalid selection.")
+        return
+    k = list(models.keys())[m]
+    learn(models[k][0], models[k][1], k)
+
+
+if __name__ == "__main__":
+    main()
