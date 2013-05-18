@@ -3,7 +3,7 @@ import features
 import numpy as np
 import scipy.stats
 import matplotlib.pyplot as plt
-from sklearn import mixture, svm, preprocessing
+from sklearn import mixture, svm, preprocessing, ensemble
 from skimage import io
 
 
@@ -49,10 +49,22 @@ def ocsvm_score(model, x):
     float(model[1].predict(model[0].transform(x))[0])
 
 
+def rf_train(positive, negative, validate):
+    X = np.vstack((positive, negative))
+    y = [1]*positive.shape[0] + [0]*negative.shape[0]
+    clf = ensemble.RandomForestClassifier()
+    return clf.fit(X, y)
+
+
+def rf_score(model, x):
+    return model.predict_log_proba(x)[0, 1]
+
+
 models = {
     "Gaussian Kernel Density Estimate": [gkde_train, gkde_score],
     "Gaussian Mixture Model": [gmm_train, gmm_score],
-    "One-Class Support Vector Machine": [ocsvm_train, ocsvm_score]
+    "One-Class Support Vector Machine": [ocsvm_train, ocsvm_score],
+    "Random Forest": [rf_train, rf_score]
 }
 
 
