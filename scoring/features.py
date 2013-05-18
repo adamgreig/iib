@@ -1,8 +1,14 @@
 import yaml
+import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import transform, io, filter, morphology, measure, feature
 from skimage.filter.rank import entropy
+
+
+def corpus_path(suffix):
+    dpath = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+    return '/'.join((dpath, "corpus", suffix))
 
 
 def edge_stats(im, show_images=False):
@@ -62,7 +68,7 @@ def stats(im):
 
 def main():
     print_stats = True
-    with open("corpus/manifest.yaml") as f:
+    with open(corpus_path("manifest.yaml")) as f:
         manifest = yaml.load(f)
     for cls in ("patterns", "nopatterns", "validation"):
         results = []
@@ -70,7 +76,7 @@ def main():
                  "Iσ")]
         dres.append(("--",)*len(dres[0]))
         for img in sorted(manifest[cls].keys()):
-            path = "corpus/"+manifest[cls][img]["path"]
+            path = corpus_path(manifest[cls][img]["path"])
             im = io.imread(path, as_grey=True)
             result = stats(im)
             results.append(result)
@@ -85,7 +91,7 @@ def main():
                 print(" ".join((val.ljust(width) for val, width in zip(row,
                       widths))))
         results = np.array(results)
-        outpath = "corpus/{0}.npy".format(cls)
+        outpath = corpus_path("{0}.npy".format(cls))
         np.save(outpath, results)
         print("Feature vectors saved to {0}".format(outpath), end='\n\n')
 

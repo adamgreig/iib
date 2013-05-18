@@ -1,7 +1,8 @@
-import colour
-import genome
-import diffusion
+from iib.simulation import colour
+from iib.simulation import genome
+from iib.simulation import diffusion
 
+import os.path
 import numpy as np
 import pyopencl as cl
 
@@ -53,13 +54,15 @@ def run_simulation(config):
         ifmt = cl.ImageFormat(c_order, c_type)
         ibuf = cl.Image(ctx, mf.WRITE_ONLY, ifmt, (gs, gs), None)
 
-        def dump_image(sig, iteration):
-            bsig = str(chr(sig)).encode()
+        def dump_image(s, iteration):
+            bsig = str(chr(s)).encode()
             program.colour(queue, (gs, gs), None, buf_a, bsig, ibuf)
             cl.enqueue_copy(
                 queue, image, ibuf, origin=(0, 0), region=(gs, gs)).wait()
             img = Image.fromarray(image.reshape((gs, gs, 4)))
-            img.save("output/{0}_{1:05d}.png".format(sig, iteration))
+            fpath = os.path.dirname(os.path.abspath(__file__))
+            path = fpath + "/output/{0}_{1:05d}.png".format(s, iteration)
+            img.save(path)
 
         for i in config.get('dump_images'):
             dump_image(i, 0)
@@ -79,33 +82,34 @@ def run_simulation(config):
     return sigs.reshape((gs, gs, 16))
 
 
-def main():
-    test_config = {
-        "grid_size": 512,
-        "wg_size": 128,
-        "iterations": 100,
-        "genome": "+A303+A513-12A2",
-        "signals": [
-            {"diffusion": 1.5, "initial": 0.0},
-            {"diffusion": 3.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": "random_binary"},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0},
-            {"diffusion": 0.0, "initial": 0.0}
-        ],
-        "dump_images": [0, 1, 10]
-    }
+test_config = {
+    "grid_size": 512,
+    "wg_size": 128,
+    "iterations": 100,
+    "genome": "+A303+A513-12A2",
+    "signals": [
+        {"diffusion": 1.5, "initial": 0.0},
+        {"diffusion": 3.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": "random_binary"},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0},
+        {"diffusion": 0.0, "initial": 0.0}
+    ],
+    "dump_images": [0, 1, 10]
+}
 
+
+def main():
     run_simulation(test_config)
 
 if __name__ == "__main__":
