@@ -3,7 +3,7 @@ import features
 import numpy as np
 import scipy.stats
 import matplotlib.pyplot as plt
-from sklearn import mixture
+from sklearn import mixture, svm, preprocessing
 from skimage import io
 
 
@@ -33,9 +33,26 @@ def gmm_score(model, x):
     return int(model.score(x)[0])
 
 
+def ocsvm_train(positive, negative, validate):
+    scaler = preprocessing.StandardScaler().fit(positive)
+    X = scaler.transform(positive)
+    clf = svm.OneClassSVM(nu=0.1, gamma=0.1, cache_size=512)
+    clf.fit(X)
+    return [scaler, clf]
+
+
+def ocsvm_score(model, x):
+    d = float(model[1].decision_function(model[0].transform(x))[0])
+    if d > 0:
+        return 0.0
+    return d * 100.0
+    float(model[1].predict(model[0].transform(x))[0])
+
+
 models = {
     "Gaussian Kernel Density Estimate": [gkde_train, gkde_score],
-    "Gaussian Mixture Model": [gmm_train, gmm_score]
+    "Gaussian Mixture Model": [gmm_train, gmm_score],
+    "One-Class Support Vector Machine": [ocsvm_train, ocsvm_score]
 }
 
 
