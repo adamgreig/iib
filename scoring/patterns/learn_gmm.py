@@ -5,10 +5,11 @@ import matplotlib.pyplot as plt
 from sklearn import mixture
 from skimage import io
 
+
 def main():
     train = np.load("corpus/patterns.npy")
-    reject = np.load("corpus/nopatterns.npy")
-    clf = mixture.GMM(n_components=2, covariance_type='full', n_iter=2000,
+    #reject = np.load("corpus/nopatterns.npy")
+    clf = mixture.GMM(n_components=3, covariance_type='full', n_iter=2000,
                       n_init=500)
     print("Fitting model...")
     clf.fit(train)
@@ -35,7 +36,7 @@ def main():
         plt.title(str(score))
 
     plt.show()
-            
+
 
 if __name__ == "__main__":
     main()

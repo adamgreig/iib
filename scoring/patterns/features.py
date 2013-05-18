@@ -3,23 +3,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage import transform, io, filter, morphology, measure, feature
 
+
 def edge_stats(path, show_images=False):
     im = io.imread(path, as_grey=True)
     if im.shape != (64, 64):
         im = transform.resize(im, (64, 64))
-    edges = filter.canny(im, sigma=1)
-    edges = morphology.label(edges, neighbors=8)
-    stats = [s['Area'] for s in measure.regionprops(edges, properties=['Area'])]
+    edgs = filter.canny(im, sigma=1)
+    edgs = morphology.label(edgs, neighbors=8)
+    stats = [s['Area'] for s in measure.regionprops(edgs, properties=['Area'])]
     stats = np.array(stats)
-    stats = stats[stats>3]
+    stats = stats[stats > 3]
     if show_images:
         plt.imshow(im, interpolation="nearest")
         plt.show()
-        plt.imshow(edges, cmap=plt.cm.Paired, interpolation='nearest')
+        plt.imshow(edgs, cmap=plt.cm.Paired, interpolation='nearest')
         plt.show()
     if not stats.size:
         return [0, 0, 0]
     return [np.size(stats), np.mean(stats), np.std(stats)]
+
 
 def blob_stats(path, show_images=False):
     im = io.imread(path, as_grey=True)
@@ -37,27 +39,41 @@ def blob_stats(path, show_images=False):
         if show_images:
             plt.subplot(4, 2, 2*idx + 1)
             plt.imshow(im, cmap='gray')
-            plt.scatter(maxms.T[1] * (2**idx), maxms.T[0] * (2**idx), s=50,c='g')
+            plt.scatter(maxms.T[1] * (2**idx), maxms.T[0] * (2**idx),
+                        s=50, c='g')
             plt.subplot(4, 2, 2*idx + 2)
             plt.imshow(pyramid[idx], cmap='gray')
-            plt.scatter(maxms.T[1], maxms.T[0], s=50,c='g')
+            plt.scatter(maxms.T[1], maxms.T[0], s=50, c='g')
     if show_images:
         plt.show()
     return num_blobs
 
+
 def main():
+    print_stats = True
     with open("corpus/manifest.yaml") as f:
         manifest = yaml.load(f)
     for cls in ("patterns", "nopatterns"):
         results = []
+        dresults = [("File", "N", "  µ", "  σ", "B1", "B2", "B3", "B4"),
+                    ("----", "--", "-----", "-----", "--", "--", "--", "--")]
         for img in sorted(manifest[cls].keys()):
             path = "corpus/"+manifest[cls][img]["path"]
             result = edge_stats(path) + blob_stats(path)
             results.append(result)
+            dresult = "{0} {1} {2:.1f} {3:.1f} {4} {5} {6} {7}".format(img,
+                                                                       *result)
+            dresults.append(dresult.split(" "))
+        if print_stats:
+            print("Stats for <{0}>:".format(cls))
+            widths = [max(map(len, col)) for col in zip(*dresults)]
+            for row in dresults:
+                print(" ".join((val.ljust(width) for val, width in zip(row,
+                      widths))))
         results = np.array(results)
         outpath = "corpus/{0}.npy".format(cls)
         np.save(outpath, results)
-        print("Feature vectors saved to {0}".format(outpath))
+        print("Feature vectors saved to {0}".format(outpath), end='\n\n')
 
 if __name__ == "__main__":
     main()

@@ -114,17 +114,17 @@ nopatterns:
         source: self made in GIMP
         description: Blank white grid
 
-    diffraction001:
+    diffraction:
         path: nopattern/diffraction001.png
         source: self made in GIMP
         description: A diffraction pattern
 
-    jigsaw001:
+    jigsaw:
         path: nopattern/jigsaw001.png
         source: self made in GIMP
         description: A simple 3x3 jigsaw pattern
 
-    maze001:
+    maze:
         path: nopattern/maze001.png
         source: self made in GIMP
         description: A maze generated using Prim's algorithm
@@ -144,7 +144,7 @@ nopatterns:
         source: self made in GIMP
         description: Random plasma pattern
 
-    supernova001:
+    supernova:
         path: nopattern/supernova001.png
         source: self made in GIMP
         description: A supernova exploding
