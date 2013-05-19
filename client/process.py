@@ -24,7 +24,7 @@ def rq_job(generation, genome, initial=None, config=None):
             cfg["signals"][10:] = [{"diffusion": 0.0, "initial": initial}]*6
     else:
         cfg = config
-    return process(cfg)
+    return list(process(cfg).flatten())
 
 standard_config = {
     "grid_size": 512,
