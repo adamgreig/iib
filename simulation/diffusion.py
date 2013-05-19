@@ -81,6 +81,7 @@ __kernel void diffusion(__global float* sigs_in, __global float* sigs_out)
 }
 """
 
+
 def sigmas_to_kernels(sigmas):
     if len(sigmas) != 16:
         raise ValueError("kernel_sigmas must have 16 entries")
@@ -94,12 +95,14 @@ def sigmas_to_kernels(sigmas):
             kernels.append(scipy.stats.norm(scale=s).pdf(range(kernel_n+1)))
     return kernels, kernel_n
 
+
 def kernels_to_cl(kernels, kernel_n):
     kernel = []
     for i in range(kernel_n + 1):
         vals = ", ".join("{0:0.8f}f".format(k[i]) for k in kernels)
         kernel.append("(float16)({0})".format(vals))
     return '\n' + ',\n'.join(kernel)
+
 
 def convolution_cl(kernel_n):
     out = []
@@ -109,14 +112,16 @@ def convolution_cl(kernel_n):
             abs(i - kernel_n), i))
     return '\n    '.join(out)
 
+
 def diffusion_cl(kernel_sigmas, wg_size):
     kernels, kernel_n = sigmas_to_kernels(kernel_sigmas)
     kernel = kernels_to_cl(kernels, kernel_n)
     convolution = convolution_cl(kernel_n)
     return Template(diffusion_cl_str).substitute(kerneln=kernel_n,
-        wgsize=wg_size, kernel=kernel, convolution=convolution)
+                                                 wgsize=wg_size, kernel=kernel,
+                                                 convolution=convolution)
 
 if __name__ == "__main__":
     sigmas = [0.8, 1.0, 1.2, 1.5, 2.0, 2.0, 5.0, 5.0] * 2
     print("// Sigmas:", sigmas)
-    print(diffusion_cl(sigmas))
+    print(diffusion_cl(sigmas, 128))

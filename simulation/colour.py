@@ -21,12 +21,14 @@ __kernel void colour(__global float* input, const uchar signal,
 }
 """
 
+
 def colour_cl():
     h2r = colorsys.hsv_to_rgb
     colour_lut = [h2r((1.0-(x/255.0)) * 2.0/3.0, 1.0, 1.0) for x in range(256)]
     colour_lut = np.array(colour_lut, np.float32).reshape(256*3).astype(float)
     colour_lut = ", ".join("{0:0.6f}f".format(k) for k in colour_lut)
     return Template(colour_cl_str).substitute(colourlut=colour_lut)
+
 
 if __name__ == "__main__":
     print(colour_cl())
