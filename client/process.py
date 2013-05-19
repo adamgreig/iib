@@ -16,6 +16,16 @@ def process_genome(genome):
     return process(cfg)
 
 
+def rq_job(generation, genome, initial=None, config=None):
+    if not config:
+        cfg = copy.deepcopy(standard_config)
+        cfg["genome"] = genome
+        if initial:
+            cfg["signals"][10:] = [{"diffusion": 0.0, "initial": initial}]*6
+    else:
+        cfg = config
+    return process(cfg)
+
 standard_config = {
     "grid_size": 512,
     "wg_size": 128,
