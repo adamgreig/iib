@@ -14,11 +14,11 @@ def preload_models():
         trained_models = pickle.load(f)
 
 
-def score(signals):
+def score(sigs):
     global trained_models
     if not trained_models:
         preload_models()
-    x = [stats(resize(signals[:, :, s], (64, 64))) for s in range(16)]
+    x = [stats(resize(sigs[:, :, s].clip(0, 1), (64, 64))) for s in range(16)]
     scores = np.array([m.score(np.array(x)) for m in trained_models])
     return np.amax(scores, axis=1)
 
