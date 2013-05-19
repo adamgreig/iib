@@ -6,7 +6,10 @@ import copy
 
 def process(config):
     signals = run.run_simulation(config)
-    scores = score.score(signals)
+    genome = config["genome"]
+    genes = (genome[i:i+5] for i in range(0, len(genome), 5))
+    used = {int(s, 16) for sl in ((g[1], g[3]) for g in genes) for s in sl}
+    scores = score.score(signals, list(used))
     return scores
 
 
@@ -52,4 +55,4 @@ standard_config = {
 
 
 if __name__ == "__main__":
-    print(process_genome("+A303+A563-62A2"))
+    print(process_genome("+A3A3+A563-62A2"))

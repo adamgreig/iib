@@ -14,13 +14,15 @@ def preload_models():
         trained_models = pickle.load(f)
 
 
-def score(sigs):
+def score(sigs, sigs_used=list(range(16))):
     global trained_models
     if not trained_models:
         preload_models()
     x = [stats(resize(sigs[:, :, s].clip(0, 1), (64, 64))) for s in range(16)]
     scores = np.array([m.score(np.array(x)) for m in trained_models])
-    return np.amax(scores, axis=1)
+    mask = np.ones_like(scores).astype(np.bool)
+    mask[:, sigs_used] = 0
+    return list(np.ma.masked_array(scores, mask).max(axis=1))
 
 
 if __name__ == "__main__":
