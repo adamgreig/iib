@@ -3,7 +3,7 @@ from string import Template
 
 genome_cl_str = """//CL//
 // A slightly leaky activation function that saturates at about x=1.0
-#define activation(x) native_recip(1.0f + native_exp(5.0f - 20.0f * x))
+#define activation(x) native_recip(1.0f + native_exp(5.0f - 10.0f * x))
 #define POS (get_global_id(1)*get_global_size(0) + get_global_id(0))
 
 __kernel void genome(__global float* sigs_in, __global float* sigs_out)
@@ -20,6 +20,12 @@ __kernel void genome(__global float* sigs_in, __global float* sigs_out)
 """
 
 Gene = namedtuple('Gene', 'reg sig_in rbs sig_out deg')
+
+
+def get_used_genes(genestr):
+    genes = parsegenes(genestr)
+    used = {int(s, 16) for sl in ((g[1], g[3]) for g in genes) for s in sl}
+    return list(used)
 
 
 def parsegenes(genestr):

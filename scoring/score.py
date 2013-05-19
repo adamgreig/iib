@@ -22,7 +22,7 @@ def score(sigs, sigs_used=list(range(16))):
     scores = np.array([m.score(np.array(x)) for m in trained_models])
     mask = np.ones_like(scores).astype(np.bool)
     mask[:, sigs_used] = 0
-    return list(np.ma.masked_array(scores, mask).max(axis=1))
+    return list(np.ma.masked_array(scores, mask).max(axis=1).flatten())
 
 
 if __name__ == "__main__":

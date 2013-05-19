@@ -40,7 +40,7 @@ def run_simulation(config):
     sigmas = [s['diffusion'] for s in config['signals']]
     progstr = genome.genome_cl(config['genome'])
     progstr += diffusion.diffusion_cl(sigmas, wgs)
-    if config.get('dump_images'):
+    if config.get('dump_images') or config.get('dump_final_image'):
         progstr += colour.colour_cl()
     program = cl.Program(ctx, progstr).build()
 
@@ -48,24 +48,28 @@ def run_simulation(config):
     buf_a = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=sigs)
     buf_b = cl.Buffer(ctx, mf.READ_WRITE, size=4*16*gs*gs)
 
-    if config.get('dump_images'):
+    if config.get('dump_images') or config.get('dump_final_image'):
         image = np.empty(gs*gs*4, np.uint8)
         c_order, c_type = cl.channel_order.RGBA, cl.channel_type.UNORM_INT8
         ifmt = cl.ImageFormat(c_order, c_type)
         ibuf = cl.Image(ctx, mf.WRITE_ONLY, ifmt, (gs, gs), None)
 
-        def dump_image(s, iteration):
+        def dump_image(s, iteration, prefix=None):
             bsig = str(chr(s)).encode()
             program.colour(queue, (gs, gs), None, buf_a, bsig, ibuf)
             cl.enqueue_copy(
                 queue, image, ibuf, origin=(0, 0), region=(gs, gs)).wait()
             img = Image.fromarray(image.reshape((gs, gs, 4)))
             fpath = os.path.dirname(os.path.abspath(__file__))
+            s = "{0:X}".format(s)
+            if prefix:
+                s = "{0}_{1}".format(prefix, s)
             path = fpath + "/output/{0}_{1:05d}.png".format(s, iteration)
             img.save(path)
 
-        for i in config.get('dump_images'):
-            dump_image(i, 0)
+        if config.get('dump_images'):
+            for i in config.get('dump_images'):
+                dump_image(i, 0)
 
     n_iters = config['iterations']
     for iteration in range(n_iters):
@@ -79,6 +83,9 @@ def run_simulation(config):
                 dump_image(i, iteration+1)
 
     cl.enqueue_copy(queue, sigs, buf_a).wait()
+    if config.get('dump_final_image'):
+        for i in genome.get_used_genes(config["genome"]):
+            dump_image(i, iteration+1, config["genome"])
     return sigs.reshape((gs, gs, 16))
 
 
