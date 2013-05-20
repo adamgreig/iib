@@ -18,7 +18,7 @@ def score(sigs, sigs_used=list(range(16))):
     global trained_models
     if not trained_models:
         preload_models()
-    x = [stats(resize(sigs[:, :, s].clip(0, 1), (64, 64))) for s in range(16)]
+    x = [stats(resize(sigs[:, :, s].clip(0, 1), (64, 64))) for s in sigs_used]
     scores = np.array([m.score(np.array(x)) for m in trained_models])
     mask = np.ones_like(scores).astype(np.bool)
     mask[:, sigs_used] = 0
@@ -26,5 +26,10 @@ def score(sigs, sigs_used=list(range(16))):
 
 
 if __name__ == "__main__":
-    sigs = np.zeros((512, 512, 16), np.float32)
-    print(score(sigs))
+    from skimage import io
+    path = input("Enter path to image: ")
+    im = io.imread(path, as_grey=True).astype(np.float32) / 255.0
+    sigs = np.zeros((64, 64, 16), np.float32)
+    sigs[:, :, 0] = im
+    print(sigs)
+    print("Scores:", score(sigs, [0]))
