@@ -4,18 +4,23 @@ from string import Template
 genome_cl_str = """//CL//
 // A slightly leaky activation function that saturates at about x=1.0
 #define activation(x) native_recip(1.0f + native_exp(5.0f - 10.0f * x))
-#define POS (get_global_id(1)*get_global_size(0) + get_global_id(0))
 
-__kernel void genome(__global float* sigs_in, __global float* sigs_out)
+__kernel void genome(__read_only  image2d_t sigs_in_a,
+                     __read_only  image2d_t sigs_in_b,
+                     __write_only image2d_t sigs_out_a,
+                     __write_only image2d_t sigs_out_b)
 {
-    __private float16 sigs;
-    sigs = vload16(POS, sigs_in);
+    __private int2 pos = (int2)(get_global_id(0), get_global_id(1));
+    __private float8 sigs;
+    sigs.lo = read_imagef(sigs_in_a, pos);
+    sigs.hi = read_imagef(sigs_in_b, pos);
 
     $degregation
 
     $production
 
-    vstore16(sigs, POS, sigs_out);
+    write_imagef(sigs_out_a, pos, sigs.lo);
+    write_imagef(sigs_out_b, pos, sigs.hi);
 }
 """
 
@@ -58,7 +63,7 @@ def prodcode(gene):
 
 def genome_cl(genestr):
     genes = parsegenes(genestr)
-    signals = [str(i) for i in range(10)] + [chr(c) for c in range(65, 71)]
+    signals = [str(i) for i in range(8)]
     degregation = "\n    ".join([degcode(genes, s) for s in signals])
     production = "\n    ".join([prodcode(g) for g in genes])
     return Template(genome_cl_str).substitute(

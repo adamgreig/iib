@@ -14,7 +14,7 @@ def run_simulation(config):
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     gs, wgs = config['grid_size'], config['wg_size']
-    sigs = np.empty((gs, gs, 16), np.float32)
+    sigs = np.empty((gs, gs, 8), np.float32)
 
     for idx, signal in enumerate(config['signals']):
         if type(signal['initial']) == float:
@@ -37,29 +37,38 @@ def run_simulation(config):
         if 'initial_offset' in signal:
             sigs[:, :, idx] += signal['initial_offset']
 
-    sigmas = [s['diffusion'] for s in config['signals']]
+    sigmas = [s['diffusion'] for s in config['signals'][:4]]
     progstr = genome.genome_cl(config['genome'])
-    progstr += diffusion.diffusion_cl(sigmas, wgs)
+    progstr += diffusion.diffusion_cl(sigmas)
     if config.get('dump_images') or config.get('dump_final_image'):
         progstr += colour.colour_cl()
     program = cl.Program(ctx, progstr).build()
 
-    sigs = sigs.reshape(gs*gs*16)
-    buf_a = cl.Buffer(ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=sigs)
-    buf_b = cl.Buffer(ctx, mf.READ_WRITE, size=4*16*gs*gs)
+    sigs_a = sigs[:, :, :4].reshape(gs*gs*4)
+    sigs_b = sigs[:, :, 4:].reshape(gs*gs*4)
+    ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
+    ibuf_1a = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
+    ibuf_1b = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
+    ibuf_2a = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
+    ibuf_2b = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
+    cl.enqueue_copy(queue, ibuf_1a, sigs_a, origin=(0, 0), region=(gs, gs))
+    cl.enqueue_copy(queue, ibuf_1b, sigs_b, origin=(0, 0), region=(gs, gs))
 
     if config.get('dump_images') or config.get('dump_final_image'):
-        image = np.empty(gs*gs*4, np.uint8)
+        image_out = np.empty(gs*gs*4, np.uint8)
         c_order, c_type = cl.channel_order.RGBA, cl.channel_type.UNORM_INT8
-        ifmt = cl.ImageFormat(c_order, c_type)
-        ibuf = cl.Image(ctx, mf.WRITE_ONLY, ifmt, (gs, gs), None)
+        ifmt_u = cl.ImageFormat(c_order, c_type)
+        ibuf_o = cl.Image(ctx, mf.WRITE_ONLY, ifmt_u, (gs, gs))
 
         def dump_image(s, iteration, prefix=None):
-            bsig = str(chr(s)).encode()
-            program.colour(queue, (gs, gs), None, buf_a, bsig, ibuf)
+            if s < 4:
+                ibuf, bsig = ibuf_1a, str(chr(s)).encode()
+            else:
+                ibuf, bsig = ibuf_1b, str(chr(s-4)).encode()
+            program.colour(queue, (gs, gs), None, ibuf, bsig, ibuf_o)
             cl.enqueue_copy(
-                queue, image, ibuf, origin=(0, 0), region=(gs, gs)).wait()
-            img = Image.fromarray(image.reshape((gs, gs, 4)))
+                queue, image_out, ibuf_o, origin=(0, 0), region=(gs, gs))
+            img = Image.fromarray(image_out.reshape((gs, gs, 4)))
             fpath = os.path.dirname(os.path.abspath(__file__))
             s = "{0:X}".format(s)
             if prefix:
@@ -73,51 +82,45 @@ def run_simulation(config):
 
     n_iters = config['iterations']
     for iteration in range(n_iters):
-        program.genome(queue, (gs, gs), None, buf_a, buf_b)
-        program.diffusion(queue, (gs, gs), (wgs, 1), buf_b, buf_a)
-        program.diffusion(queue, (gs, gs), (1, wgs), buf_a, buf_b)
-        buf_a, buf_b = buf_b, buf_a
+        program.genome(queue, (gs, gs), None,
+                       ibuf_1a, ibuf_1b, ibuf_2a, ibuf_2b)
+        program.convolve_x(queue, (gs, gs), (wgs, 1), ibuf_2a, ibuf_1a)
+        program.convolve_y(queue, (gs, gs), (1, wgs), ibuf_1a, ibuf_2a)
+        ibuf_1a, ibuf_2a = ibuf_2a, ibuf_1a
+        ibuf_1b, ibuf_2b = ibuf_2b, ibuf_1b
 
         if config.get('dump_images'):
             for i in config.get('dump_images'):
                 dump_image(i, iteration+1)
 
-    cl.enqueue_copy(queue, sigs, buf_a).wait()
     if config.get('dump_final_image'):
         for i in genome.get_used_genes(config["genome"]):
             dump_image(i, iteration+1, config["genome"])
-    return sigs.reshape((gs, gs, 16))
+    cl.enqueue_copy(queue, sigs_a, ibuf_1a, origin=(0, 0), region=(gs, gs))
+    cl.enqueue_copy(queue, sigs_b, ibuf_1b, origin=(0, 0), region=(gs, gs))
+    sigs[:, :, :4] = sigs_a.reshape((gs, gs, 4))
+    sigs[:, :, 4:] = sigs_b.reshape((gs, gs, 4))
+    return sigs
 
 
 test_config = {
     "grid_size": 512,
-    "wg_size": 128,
+    "wg_size": 256,
     "iterations": 100,
-    "genome": "+A303+A513-12A2",
+    "genome": "+4303+4513-1242",
     "signals": [
-        {"diffusion": 1.5, "initial": 0.0},
+        {"diffusion": 1.0, "initial": 0.0},
+        {"diffusion": 1.0, "initial": 0.0},
         {"diffusion": 3.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": "random_binary"},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": 0.0}
+        {"diffusion": 5.0, "initial": 0.0},
+        {"initial": "random_binary"},
+        {"initial": "random_binary"},
+        {"initial": "random_binary"},
+        {"initial": "random_binary"},
     ],
-    "dump_images": [0, 1, 10]
+    "dump_images": [0, 1, 4]
 }
 
 
-def main():
-    run_simulation(test_config)
-
 if __name__ == "__main__":
-    main()
+    print(run_simulation(test_config))
