@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 from skimage import io
 
 cls_lut = {
-    "patterns": "b",
-    "nopatterns": "r",
-    "validation": "g"
+    "patterns": "blue",
+    "nopatterns": "red",
+    "validation": "green",
+    "test": "cyan"
 }
 
 models = [
@@ -38,7 +39,7 @@ def score(model):
     for cls in manifest.keys():
         for img in sorted(manifest[cls].keys()):
             path = corpus_path(manifest[cls][img]["path"])
-            im = io.imread(path)
+            im = io.imread(path, as_grey=True)
             x = feature_stats(im)
             score = float(model.score(np.array([x])))
             scores.append((score, path, cls))

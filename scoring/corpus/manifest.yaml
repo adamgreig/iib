@@ -155,3 +155,9 @@ validation:
 
     validate002:
         path: validation/cheetah001.jpg
+
+test:
+    blobs001:
+        path: test/blobs001.png
+    blobs002:
+        path: test/blobs002.png
