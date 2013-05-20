@@ -13,7 +13,7 @@ def run_simulation(config):
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
-    gs, wgs = config['grid_size'], config['wg_size']
+    gs = config['grid_size']
     sigs = np.empty((gs, gs, 8), np.float32)
 
     for idx, signal in enumerate(config['signals']):
@@ -65,7 +65,7 @@ def run_simulation(config):
                 ibuf, bsig = ibuf_1a, str(chr(s)).encode()
             else:
                 ibuf, bsig = ibuf_1b, str(chr(s-4)).encode()
-            program.colour(queue, (gs, gs), None, ibuf, bsig, ibuf_o)
+            program.colour(queue, (gs, gs), (16, 16), ibuf, bsig, ibuf_o)
             cl.enqueue_copy(
                 queue, image_out, ibuf_o, origin=(0, 0), region=(gs, gs))
             img = Image.fromarray(image_out.reshape((gs, gs, 4)))
@@ -82,10 +82,10 @@ def run_simulation(config):
 
     n_iters = config['iterations']
     for iteration in range(n_iters):
-        program.genome(queue, (gs, gs), None,
+        program.genome(queue, (gs, gs), (16, 16),
                        ibuf_1a, ibuf_1b, ibuf_2a, ibuf_2b)
-        program.convolve_x(queue, (gs, gs), (wgs, 1), ibuf_2a, ibuf_1a)
-        program.convolve_y(queue, (gs, gs), (1, wgs), ibuf_1a, ibuf_2a)
+        program.convolve_x(queue, (gs, gs), (16, 16), ibuf_2a, ibuf_1a)
+        program.convolve_y(queue, (gs, gs), (16, 16), ibuf_1a, ibuf_2a)
         ibuf_1a, ibuf_2a = ibuf_2a, ibuf_1a
         ibuf_1b, ibuf_2b = ibuf_2b, ibuf_1b
 
@@ -105,7 +105,6 @@ def run_simulation(config):
 
 test_config = {
     "grid_size": 512,
-    "wg_size": 256,
     "iterations": 100,
     "genome": "+4303+4513-1242",
     "signals": [
