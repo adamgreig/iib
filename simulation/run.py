@@ -104,7 +104,7 @@ def run_simulation(config):
 
 
 test_config = {
-    "grid_size": 512,
+    "grid_size": 256,
     "iterations": 100,
     "genome": "+4303+4513-1242",
     "signals": [
