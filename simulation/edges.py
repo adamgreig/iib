@@ -55,7 +55,7 @@ def test():
     import matplotlib.pyplot as plt
     from PIL import Image
     from skimage import data, transform
-    from iib.simulation import convolution
+    from iib.simulation import convolution, reduction
     gs, wgs = 256, 16
     r = transform.resize
     coins = r(data.coins().astype(np.float32) / 255.0, (gs, gs))
@@ -80,13 +80,14 @@ def test():
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
-    program = cl.Program(ctx, edges_cl()).build()
+    prog = cl.Program(ctx, edges_cl()).build()
+    rdctn = cl.Program(ctx, reduction.reduction_sum_cl()).build()
     ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
     ibuf_in = cl.Image(ctx, mf.READ_ONLY, ifmt_f, (gs, gs))
     ibuf_a = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
     ibuf_b = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
     ibuf_c = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
-    ibuf_out = cl.Image(ctx, mf.WRITE_ONLY, ifmt_f, (gs, gs))
+    #ibuf_out = cl.Image(ctx, mf.WRITE_ONLY, ifmt_f, (gs, gs))
     cl.enqueue_copy(queue, ibuf_in, sigs, origin=(0, 0), region=(gs, gs))
     blur1 = cl.Program(ctx, convolution.gaussian_cl([3.0]*4)).build()
     blur2 = cl.Program(ctx, convolution.gaussian_cl([1.9]*4)).build()
@@ -97,10 +98,14 @@ def test():
         blur1.convolve_y(queue, (gs, gs), (wgs, wgs), ibuf_b, ibuf_a)
         blur2.convolve_x(queue, (gs, gs), (wgs, wgs), ibuf_in, ibuf_c)
         blur2.convolve_y(queue, (gs, gs), (wgs, wgs), ibuf_c, ibuf_b)
-        program.edges(queue, (gs, gs), (wgs, wgs),
-                      ibuf_a, ibuf_b, ibuf_out).wait()
+        prog.edges(queue, (gs, gs), (wgs, wgs), ibuf_a, ibuf_b, ibuf_c)
+        out = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
+                                      ibuf_c, ibuf_a, ibuf_b)
     print(time.time())
-    cl.enqueue_copy(queue, edges, ibuf_out, origin=(0, 0), region=(gs, gs))
+    cl.enqueue_copy(queue, edges, ibuf_c, origin=(0, 0), region=(gs, gs))
+    count = np.empty(4, np.float32)
+    cl.enqueue_copy(queue, count, out, origin=(0, 0), region=(1, 1))
+    print(count[:4])
 
     for i in range(4):
         subimg = edges.reshape((gs, gs, 4))[:, :, i]
