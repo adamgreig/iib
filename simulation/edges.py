@@ -89,8 +89,8 @@ def test():
     ibuf_c = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
     #ibuf_out = cl.Image(ctx, mf.WRITE_ONLY, ifmt_f, (gs, gs))
     cl.enqueue_copy(queue, ibuf_in, sigs, origin=(0, 0), region=(gs, gs))
-    blur1 = cl.Program(ctx, convolution.gaussian_cl([3.0]*4)).build()
-    blur2 = cl.Program(ctx, convolution.gaussian_cl([1.9]*4)).build()
+    blur1 = cl.Program(ctx, convolution.gaussian_cl([4.0]*4)).build()
+    blur2 = cl.Program(ctx, convolution.gaussian_cl([2.0]*4)).build()
 
     print(time.time())
     for i in range(1000):
