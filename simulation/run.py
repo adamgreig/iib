@@ -1,5 +1,6 @@
 from iib.simulation import colour
 from iib.simulation import genome
+from iib.simulation import reduction
 from iib.simulation import diffusion
 
 import os.path
@@ -9,10 +10,7 @@ import pyopencl as cl
 from PIL import Image
 
 
-def run_simulation(config):
-    ctx = cl.create_some_context(interactive=False)
-    queue = cl.CommandQueue(ctx)
-    mf = cl.mem_flags
+def set_up_signals(config):
     gs = config['grid_size']
     sigs = np.empty((gs, gs, 8), np.float32)
 
@@ -37,12 +35,24 @@ def run_simulation(config):
         if 'initial_offset' in signal:
             sigs[:, :, idx] += signal['initial_offset']
 
+
+def assemble_progstr(config):
     sigmas = [s['diffusion'] for s in config['signals'][:4]]
     progstr = genome.genome_cl(config['genome'])
     progstr += diffusion.diffusion_cl(sigmas)
+    progstr += reduction.reduction_add_cl()
     if config.get('dump_images') or config.get('dump_final_image'):
         progstr += colour.colour_cl()
-    program = cl.Program(ctx, progstr).build()
+    return progstr
+
+
+def run_simulation(config):
+    ctx = cl.create_some_context(interactive=False)
+    queue = cl.CommandQueue(ctx)
+    mf = cl.mem_flags
+    gs = config['grid_size']
+    sigs = set_up_signals(config)
+    program = cl.Program(ctx, assemble_progstr()).build()
 
     sigs_a = sigs[:, :, :4].reshape(gs*gs*4)
     sigs_b = sigs[:, :, 4:].reshape(gs*gs*4)
@@ -76,9 +86,9 @@ def run_simulation(config):
             path = fpath + "/output/{0}_{1:05d}.png".format(s, iteration)
             img.save(path)
 
-        if config.get('dump_images'):
-            for i in config.get('dump_images'):
-                dump_image(i, 0)
+    if config.get('dump_images'):
+        for i in config.get('dump_images'):
+            dump_image(i, 0)
 
     n_iters = config['iterations']
     for iteration in range(n_iters):
