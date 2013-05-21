@@ -1,7 +1,7 @@
 from iib.simulation import colour
 from iib.simulation import genome
 from iib.simulation import reduction
-from iib.simulation import diffusion
+from iib.simulation import convolution
 
 import os.path
 import numpy as np
@@ -39,7 +39,7 @@ def set_up_signals(config):
 def assemble_progstr(config):
     sigmas = [s['diffusion'] for s in config['signals'][:4]]
     progstr = genome.genome_cl(config['genome'])
-    progstr += diffusion.diffusion_cl(sigmas)
+    progstr += convolution.gaussian_cl(sigmas)
     progstr += reduction.reduction_add_cl()
     if config.get('dump_images') or config.get('dump_final_image'):
         progstr += colour.colour_cl()

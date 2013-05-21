@@ -14,7 +14,7 @@ __kernel void edges(__read_only  image2d_t imgin1,
 
     __private float4 lmin = INFINITY, lmax = -INFINITY;
     __private float4 val;
-    
+
     $findminmax
 
     val.s0 = lmin.s0 < -TH && lmax.s0 > TH ? 1.0f : 0.0f;
@@ -26,6 +26,7 @@ __kernel void edges(__read_only  image2d_t imgin1,
 
 }
 """
+
 
 def edges_cl(threshold=0.01, width=1):
     windowlines = []
@@ -54,7 +55,7 @@ def test():
     import matplotlib.pyplot as plt
     from PIL import Image
     from skimage import data, transform
-    from iib.simulation import diffusion
+    from iib.simulation import convolution
     gs, wgs = 256, 16
     r = transform.resize
     coins = r(data.coins().astype(np.float32) / 255.0, (gs, gs))
@@ -87,18 +88,19 @@ def test():
     ibuf_c = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
     ibuf_out = cl.Image(ctx, mf.WRITE_ONLY, ifmt_f, (gs, gs))
     cl.enqueue_copy(queue, ibuf_in, sigs, origin=(0, 0), region=(gs, gs))
+    blur1 = cl.Program(ctx, convolution.gaussian_cl([3.0]*4)).build()
+    blur2 = cl.Program(ctx, convolution.gaussian_cl([1.9]*4)).build()
 
     print(time.time())
     for i in range(1000):
-        blur1 = cl.Program(ctx, diffusion.diffusion_cl([3.0]*4)).build()
-        blur2 = cl.Program(ctx, diffusion.diffusion_cl([1.9]*4)).build()
         blur1.convolve_x(queue, (gs, gs), (wgs, wgs), ibuf_in, ibuf_b)
         blur1.convolve_y(queue, (gs, gs), (wgs, wgs), ibuf_b, ibuf_a)
         blur2.convolve_x(queue, (gs, gs), (wgs, wgs), ibuf_in, ibuf_c)
         blur2.convolve_y(queue, (gs, gs), (wgs, wgs), ibuf_c, ibuf_b)
-        program.edges(queue, (gs, gs), (wgs, wgs), ibuf_a, ibuf_b, ibuf_out)
-        cl.enqueue_copy(queue, edges, ibuf_out, origin=(0, 0), region=(gs, gs))
+        program.edges(queue, (gs, gs), (wgs, wgs),
+                      ibuf_a, ibuf_b, ibuf_out).wait()
     print(time.time())
+    cl.enqueue_copy(queue, edges, ibuf_out, origin=(0, 0), region=(gs, gs))
 
     for i in range(4):
         subimg = edges.reshape((gs, gs, 4))[:, :, i]
