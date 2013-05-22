@@ -1,4 +1,8 @@
+import numpy as np
+import pyopencl as cl
+
 from string import Template
+from iib.simulation import convolution, reduction
 
 features_cl_str = """//CL//
 #define ETH ( $edge_threshold )
@@ -72,10 +76,56 @@ __kernel void blobs(__read_only  image2d_t l0,
 
     write_imagef(imgout, (int2)(x, y), val);
 }
+
+__kernel void entropy(__read_only image2d_t in, __write_only image2d_t out)
+{
+    __private ushort x = get_global_id(0);
+    __private ushort y = get_global_id(1);
+
+    __private float4 val;
+    __private uchar4 hist[128];
+    __private ushort i;
+
+    for(i=0; i<128; i++)
+        hist[i] = (uchar4)(0);
+
+    $countvals
+
+    __private float4 entropy = (float4)(0.0f);
+    __private float sumf = (float)($enp);
+    __private float p;
+    for(i=0; i<128; i++) {
+        if(hist[i].s0 > 0) {
+            p = (float)(hist[i].s0) / sumf;
+            entropy.s0 -= p * native_log2(p);
+        }
+        if(hist[i].s1 > 0) {
+            p = (float)(hist[i].s1) / sumf;
+            entropy.s1 -= p * native_log2(p);
+        }
+        if(hist[i].s2 > 0) {
+            p = (float)(hist[i].s2) / sumf;
+            entropy.s2 -= p * native_log2(p);
+        }
+        if(hist[i].s3 > 0) {
+            p = (float)(hist[i].s3) / sumf;
+            entropy.s3 -= p * native_log2(p);
+        }
+    }
+
+    write_imagef(out, (int2)(x, y), entropy);
+}
+
+__kernel void variance(__read_only image2d_t in, __write_only image2d_t out)
+{
+    __private int2 p = (int2)(get_global_id(0), get_global_id(1));
+    __private float4 v = read_imagef(in, p);
+    write_imagef(out, p, native_powr(v, (float4)(2.0f)));
+}
 """
 
 
-def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1):
+def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1, ew=3):
     lines0, lines1, lines2 = [], [], []
     val0 = "val = read_imagef(l0, esampler, (int2)((x{0:+d})*2, (y{1:+d})*2));"
     val1 = "val = read_imagef(l1, esampler, (int2)(x{0:+d}, y{1:+d}));"
@@ -100,22 +150,33 @@ def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1):
     lines0 = '\n    '.join(lines0)
     lines1 = '\n    '.join(lines1)
     lines2 = '\n    '.join(lines2)
+
     eth = "{0:0.4f}f".format(edge_threshold)
     bth = "{0:0.4f}f".format(blob_threshold)
+
+    countlines = []
+    c1 = "val = 128.0f * read_imagef(in, esampler, (int2)(x{0:+d}, y{1:+d}));"
+    c2 = "hist[convert_uchar(val.s0)].s0++; hist[convert_uchar(val.s1)].s1++;"
+    c3 = "hist[convert_uchar(val.s2)].s2++; hist[convert_uchar(val.s3)].s3++;"
+    for u in reversed(range(-ew, ew+1)):
+        for v in reversed(range(-ew, ew+1)):
+            countlines.append(c1.format(u, v))
+            countlines.append(c2)
+            countlines.append(c3)
+    countlines = '\n    '.join(countlines)
 
     return Template(features_cl_str).substitute(edge_threshold=eth,
                                                 blob_threshold=bth,
                                                 minmax0=lines0,
                                                 minmax1=lines1,
-                                                minmax2=lines2)
+                                                minmax2=lines2,
+                                                countvals=countlines,
+                                                enp=(2*ew + 1)**2)
 
 
 def test():
-    import numpy as np
-    import pyopencl as cl
     import matplotlib.pyplot as plt
     from skimage import io, data, transform
-    from iib.simulation import convolution, reduction
 
     gs, wgs = 256, 16
 
@@ -130,9 +191,6 @@ def test():
     sigs[:, :, 3] = io.imread("../scoring/corpus/synthetic/blobs.png",
                               as_grey=True)
     sigs = sigs.reshape(gs*gs*4)
-
-    edges = np.empty((gs, gs, 4), np.float32)
-    count = np.empty(4, np.float32)
 
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
@@ -152,6 +210,30 @@ def test():
 
     cl.enqueue_copy(queue, bufi, sigs, origin=(0, 0), region=(gs, gs))
 
+    entropy = np.empty(4, np.float32)
+    feats.entropy(queue, (gs, gs), (wgs, wgs), bufi, bufa)
+    bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
+                                   bufa, bufb, bufc)
+    cl.enqueue_copy(queue, entropy, bufo, origin=(0, 0), region=(1, 1))
+    entropy /= (gs * gs)
+    print("Average entropy:", entropy)
+
+    mean = np.empty(4, np.float32)
+    variance = np.empty(4, np.float32)
+    bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
+                                   bufi, bufa, bufb)
+    cl.enqueue_copy(queue, mean, bufo, origin=(0, 0), region=(1, 1))
+    mean /= (gs * gs)
+    feats.variance(queue, (gs, gs), (wgs, wgs), bufi, bufa)
+    bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
+                                   bufa, bufb, bufc)
+    cl.enqueue_copy(queue, variance, bufo, origin=(0, 0), region=(1, 1))
+    variance /= (gs * gs)
+    variance -= mean ** 2
+    print("Variance:", variance)
+
+    edges = np.empty((gs, gs, 4), np.float32)
+    count = np.empty(4, np.float32)
     blur4.convolve_x(queue, (gs, gs), (wgs, wgs), bufi, bufb)
     blur4.convolve_y(queue, (gs, gs), (wgs, wgs), bufb, bufa)  # bufa t=2
     blur4.convolve_x(queue, (gs, gs), (wgs, wgs), bufa, bufc)
