@@ -130,23 +130,19 @@ def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1, ew=3):
     val0 = "val = read_imagef(l0, esampler, (int2)((x{0:+d})*2, (y{1:+d})*2));"
     val1 = "val = read_imagef(l1, esampler, (int2)(x{0:+d}, y{1:+d}));"
     val2 = "val = read_imagef(l2, esampler, (int2)((x{0:+d})/2, (y{1:+d})/2));"
-    minl = "lmin = min(lmin, val);"
-    maxl = "lmax = max(lmax, val);"
+    minmaxl = "lmin = min(lmin, val); lmax = max(lmax, val);"
     for u in reversed(range(-width, width+1)):
         for v in reversed(range(-width, width+1)):
             lines0.append(val0.format(u, v))
             lines0.append(val0.format(u, v))
-            lines0.append(minl)
-            lines0.append(maxl)
+            lines0.append(minmaxl)
             if not (u == 0 and v == 0):
                 lines1.append(val1.format(u, v))
                 lines1.append(val1.format(u, v))
-                lines1.append(minl)
-                lines1.append(maxl)
+                lines1.append(minmaxl)
             lines2.append(val2.format(u, v))
             lines2.append(val2.format(u, v))
-            lines2.append(minl)
-            lines2.append(maxl)
+            lines2.append(minmaxl)
     lines0 = '\n    '.join(lines0)
     lines1 = '\n    '.join(lines1)
     lines2 = '\n    '.join(lines2)
@@ -174,12 +170,152 @@ def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1, ew=3):
                                                 enp=(2*ew + 1)**2)
 
 
+def get_variance(clctx, features, reductions, buf_in):
+    """Using the *features* and *reductions* programs, find Var[*buf_in*]."""
+    gs, wgs = clctx.gs, clctx.wgs
+    buf = cl.Image(clctx.ctx, cl.mem_flags.READ_WRITE, clctx.ifmt, (gs, gs))
+    mean = reduction.run_reduction(clctx, reductions.reduction_sum, buf_in)
+    mean /= gs * gs
+    features.variance(clctx.queue, (gs, gs), (wgs, wgs), buf_in, buf)
+    variance = reduction.run_reduction(clctx, reductions.reduction_sum, buf)
+    variance /= gs * gs
+    variance -= mean ** 2
+    buf.release()
+    return variance
+
+
+def get_entropy(clctx, features, reductions, buf_in):
+    """Using the *features* and *reductions* programs, find H[*buf_in*]."""
+    gs, wgs = clctx.gs, clctx.wgs
+    buf = cl.Image(clctx.ctx, cl.mem_flags.READ_WRITE, clctx.ifmt, (gs, gs))
+    features.entropy(clctx.queue, (gs, gs), (wgs, wgs), buf_in, buf)
+    entropy = reduction.run_reduction(clctx, reductions.reduction_sum, buf)
+    entropy /= (gs * gs)
+    buf.release()
+    return entropy
+
+
+def get_edges(clctx, features, reductions, blurs, buf_in, summarise=True):
+    """
+    Using the *features* and *reductions* programs, and *blurs* program with
+    sigma=2.0, find all edge pixels in *buf_in* and return the count.
+    """
+    gs, wgs = clctx.gs, clctx.wgs
+    bufa = cl.Image(clctx.ctx, cl.mem_flags.READ_WRITE, clctx.ifmt, (gs, gs))
+    bufb = cl.Image(clctx.ctx, cl.mem_flags.READ_WRITE, clctx.ifmt, (gs, gs))
+    bufc = cl.Image(clctx.ctx, cl.mem_flags.READ_WRITE, clctx.ifmt, (gs, gs))
+
+    blurs.convolve_x(clctx.queue, (gs, gs), (wgs, wgs), buf_in, bufb)
+    blurs.convolve_y(clctx.queue, (gs, gs), (wgs, wgs), bufb, bufa)
+    blurs.convolve_x(clctx.queue, (gs, gs), (wgs, wgs), bufa, bufc)
+    blurs.convolve_y(clctx.queue, (gs, gs), (wgs, wgs), bufc, bufb)
+
+    features.subtract(clctx.queue, (gs, gs), (wgs, wgs), bufb, bufa, bufc)
+    features.edges(clctx.queue, (gs, gs), (wgs, wgs), bufc, bufa)
+    counts = reduction.run_reduction(clctx, reductions.reduction_sum, bufa)
+
+    if not summarise:
+        edges = np.empty((gs, gs, 4), np.float32)
+        cl.enqueue_copy(clctx.queue, edges, bufa,
+                        origin=(0, 0), region=(gs, gs))
+
+    bufa.release()
+    bufb.release()
+    bufc.release()
+
+    if summarise:
+        return counts
+    else:
+        return edges
+
+
+def get_blobs(clctx, features, reductions, blurs, buf_in, summarise=True):
+    """
+    Using the *features* and *reductions* programs, and *blurs* program with
+    sigma=sqrt(2.0), find all the blobs in *buf_in* at five scales and return
+    the count at each scale.
+    """
+    counts = np.empty((5, 4), np.float32)
+    gs, wgs = clctx.gs, clctx.wgs
+    mf = cl.mem_flags
+    bufa = cl.Image(clctx.ctx, cl.mem_flags.READ_WRITE, clctx.ifmt, (gs, gs))
+    cl.enqueue_copy(clctx.queue, bufa, buf_in, src_origin=(0, 0),
+                    dest_origin=(0, 0), region=(gs, gs))
+    l_prev, l_curr, g_prev = None, None, bufa
+
+    if not summarise:
+        blobs = []
+
+    for i in range(7):
+        # Prepare next layer
+        d = gs // (2**i)
+        swg = wgs if wgs <= d else d
+        g_blurr = cl.Image(clctx.ctx, mf.READ_WRITE, clctx.ifmt, (d, d))
+        g_temp = cl.Image(clctx.ctx, mf.READ_WRITE, clctx.ifmt, (d, d))
+        l_next = cl.Image(clctx.ctx, mf.READ_WRITE, clctx.ifmt, (d, d))
+        blurs.convolve_x(clctx.queue, (d, d), (swg, swg), g_prev, g_temp)
+        blurs.convolve_y(clctx.queue, (d, d), (swg, swg), g_temp, g_blurr)
+        features.subtract(clctx.queue, (d, d), (swg, swg),
+                          g_blurr, g_prev, l_next)
+
+        # Find blobs in current layer
+        if i >= 2:
+            d = gs // (2**(i-1))
+            swg = wgs if wgs <= d else d
+            out = cl.Image(clctx.ctx, mf.READ_WRITE, clctx.ifmt, (d, d))
+            features.blobs(clctx.queue, (d, d), (swg, swg),
+                           l_prev, l_curr, l_next, out)
+            rs = reductions.reduction_sum
+            counts[i-2] = reduction.run_reduction(clctx, rs, out)
+            if not summarise:
+                blobs.append(np.empty((d, d, 4), np.float32))
+                cl.enqueue_copy(clctx.queue, blobs[-1], out,
+                                origin=(0, 0), region=(d, d))
+            out.release()
+
+        # Resize current layer to start the next layer
+        d = gs // (2**(i+1))
+        swg = wgs if wgs <= d else d
+        g_resize = cl.Image(clctx.ctx, mf.READ_WRITE, clctx.ifmt, (d, d))
+        features.subsample(clctx.queue, (d, d), (swg, swg), g_blurr, g_resize)
+
+        # Cycle through buffers
+        g_blurr.release()
+        g_temp.release()
+        g_prev.release()
+        if l_prev:
+            l_prev.release()
+        g_prev = g_resize
+        l_prev = l_curr
+        l_curr = l_next
+
+    if summarise:
+        return counts
+    else:
+        return blobs
+
+
+def get_features(clctx, features, reductions, blur2, blur4, buf_in):
+    """
+    Return the 8-dimensional feature vector of *buf_in*.
+    *features* and *reductions* are the eponymous programs.
+    *blur2* and *blur4* are convolution with sigma=sqrt(2), 2 respectively.
+    """
+    edge_counts = get_edges(clctx, features, reductions, blur4, buf_in)
+    blob_counts = get_blobs(clctx, features, reductions, blur2, buf_in)
+    variance = get_variance(clctx, features, reductions, buf_in)
+    entropy = get_entropy(clctx, features, reductions, buf_in)
+    return np.vstack((edge_counts, blob_counts, variance, entropy))
+
+
 def test():
     import matplotlib.pyplot as plt
     from skimage import io, data, transform
+    from iib.simulation import CLContext
 
     gs, wgs = 256, 16
 
+    # Load some test data
     r = transform.resize
     sigs = np.empty((gs, gs, 4), np.float32)
     sigs[:, :, 0] = r(data.coins().astype(np.float32) / 255.0, (gs, gs))
@@ -192,116 +328,39 @@ def test():
                               as_grey=True)
     sigs = sigs.reshape(gs*gs*4)
 
+    # Set up OpenCL
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
+    ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
+    bufi = cl.Image(ctx, mf.READ_ONLY, ifmt_f, (gs, gs))
+    cl.enqueue_copy(queue, bufi, sigs, origin=(0, 0), region=(gs, gs))
+    clctx = CLContext(ctx, queue, ifmt_f, gs, wgs)
 
+    # Compile the kernels
     feats = cl.Program(ctx, features_cl()).build()
     rdctn = cl.Program(ctx, reduction.reduction_sum_cl()).build()
     blur2 = cl.Program(ctx, convolution.gaussian_cl([np.sqrt(2.0)]*4)).build()
     blur4 = cl.Program(ctx, convolution.gaussian_cl([np.sqrt(4.0)]*4)).build()
 
-    ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
-    bufi = cl.Image(ctx, mf.READ_ONLY, ifmt_f, (gs, gs))
-    bufa = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
-    bufb = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
-    bufc = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
-    bufd = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
-
-    cl.enqueue_copy(queue, bufi, sigs, origin=(0, 0), region=(gs, gs))
-
-    entropy = np.empty(4, np.float32)
-    feats.entropy(queue, (gs, gs), (wgs, wgs), bufi, bufa)
-    bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
-                                   bufa, bufb, bufc)
-    cl.enqueue_copy(queue, entropy, bufo, origin=(0, 0), region=(1, 1))
-    entropy /= (gs * gs)
+    entropy = get_entropy(clctx, feats, rdctn, bufi)
     print("Average entropy:", entropy)
 
-    mean = np.empty(4, np.float32)
-    variance = np.empty(4, np.float32)
-    bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
-                                   bufi, bufa, bufb)
-    cl.enqueue_copy(queue, mean, bufo, origin=(0, 0), region=(1, 1))
-    mean /= (gs * gs)
-    feats.variance(queue, (gs, gs), (wgs, wgs), bufi, bufa)
-    bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
-                                   bufa, bufb, bufc)
-    cl.enqueue_copy(queue, variance, bufo, origin=(0, 0), region=(1, 1))
-    variance /= (gs * gs)
-    variance -= mean ** 2
+    variance = get_variance(clctx, feats, rdctn, bufi)
     print("Variance:", variance)
 
-    edges = np.empty((gs, gs, 4), np.float32)
-    count = np.empty(4, np.float32)
-    blur4.convolve_x(queue, (gs, gs), (wgs, wgs), bufi, bufb)
-    blur4.convolve_y(queue, (gs, gs), (wgs, wgs), bufb, bufa)  # bufa t=2
-    blur4.convolve_x(queue, (gs, gs), (wgs, wgs), bufa, bufc)
-    blur4.convolve_y(queue, (gs, gs), (wgs, wgs), bufc, bufb)  # bufb t=4
-    feats.subtract(queue, (gs, gs), (wgs, wgs), bufb, bufa, bufc)  # c = b - a
-    feats.edges(queue, (gs, gs), (wgs, wgs), bufc, bufd)  # d = edges
-    cl.enqueue_copy(queue, edges, bufd, origin=(0, 0), region=(gs, gs))
+    edges = get_edges(clctx, feats, rdctn, blur4, bufi, summarise=False)
+    edge_counts = get_edges(clctx, feats, rdctn, blur4, bufi)
+    print("Edge pixel counts:", edge_counts)
 
-    bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
-                                   bufd, bufa, bufb)  # a, b dirty, o = counts
-    cl.enqueue_copy(queue, count, bufo, origin=(0, 0), region=(1, 1))
-    print("Edge pixel counts:", count[:4])
+    blobs = get_blobs(clctx, feats, rdctn, blur2, bufi, summarise=False)
 
-    blobs = []
-    space = []
-    cl.enqueue_copy(queue, bufa, bufi, src_origin=(0, 0), dest_origin=(0, 0),
-                    region=(gs, gs))
-    l_prev, l_curr, g_prev = bufc, bufb, bufa
-    for i in range(7):
-        # Prepare next layer
-        d = gs // (2**i)
-        swg = wgs if wgs <= d else d
-        g_blurr = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
-        g_temp = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
-        l_next = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
-        blur2.convolve_x(queue, (d, d), (swg, swg), g_prev, g_temp)
-        blur2.convolve_y(queue, (d, d), (swg, swg), g_temp, g_blurr)
-        feats.subtract(queue, (d, d), (swg, swg), g_blurr, g_prev, l_next)
-        space.append(np.empty((d, d, 4), np.float32))
-        cl.enqueue_copy(queue, space[-1], l_next, origin=(0, 0), region=(d, d))
+    features = get_features(clctx, feats, rdctn, blur2, blur4, bufi)
+    print("Feature vector:")
+    print(features)
 
-        # Find blobs in current layer
-        if i >= 2:
-            d = gs // (2**(i-1))
-            swg = wgs if wgs <= d else d
-            out = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
-            feats.blobs(queue, (d, d), (swg, swg), l_prev, l_curr, l_next, out)
-            blobs.append(np.empty((d, d, 4), np.float32))
-            cl.enqueue_copy(queue, blobs[-1], out,
-                            origin=(0, 0), region=(d, d))
-            out.release()
-
-        # Resize current layer to start the next layer
-        d = gs // (2**(i+1))
-        swg = wgs if wgs <= d else d
-        g_resize = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
-        feats.subsample(queue, (d, d), (swg, swg), g_blurr, g_resize)
-
-        # Cycle through buffers
-        g_blurr.release()
-        g_temp.release()
-        g_prev.release()
-        l_prev.release()
-        g_prev = g_resize
-        l_prev = l_curr
-        l_curr = l_next
-
-    #for i in range(6):
-    if False:
-        sspace = space[i]
-        plt.subplot(2, 3, i+1)
-        plt.imshow(sspace[:, :, 3], cmap="gray")
-        plt.xticks([])
-        plt.yticks([])
-
+    # Plot the edges and blobs
     for i in range(4):
-    #if False:
-
         plt.subplot(4, 3, i*3+1)
         img = sigs.reshape((gs, gs, 4))[:, :, i]
         plt.imshow(img, cmap="gray")
