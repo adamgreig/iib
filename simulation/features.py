@@ -390,6 +390,47 @@ def test():
     plt.show()
 
 
+def profile():
+    import time
+    from iib.simulation import CLContext
+    from skimage import io, data, transform
+    gs, wgs = 256, 16
+
+    # Load some test data
+    r = transform.resize
+    sigs = np.empty((gs, gs, 4), np.float32)
+    sigs[:, :, 0] = r(data.coins().astype(np.float32) / 255.0, (gs, gs))
+    sigs[:, :, 1] = r(data.camera().astype(np.float32) / 255.0, (gs, gs))
+    sigs[:, :, 2] = r(data.text().astype(np.float32) / 255.0, (gs, gs))
+    sigs[:, :, 3] = r(data.checkerboard().astype(np.float32) / 255.0, (gs, gs))
+    sigs[:, :, 2] = r(io.imread("../scoring/corpus/rds/turing_001.png",
+                                as_grey=True), (gs, gs))
+    sigs[:, :, 3] = io.imread("../scoring/corpus/synthetic/blobs.png",
+                              as_grey=True)
+    sigs = sigs.reshape(gs*gs*4)
+
+    # Set up OpenCL
+    ctx = cl.create_some_context(interactive=False)
+    queue = cl.CommandQueue(ctx)
+    mf = cl.mem_flags
+    ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
+    bufi = cl.Image(ctx, mf.READ_ONLY, ifmt_f, (gs, gs))
+    cl.enqueue_copy(queue, bufi, sigs, origin=(0, 0), region=(gs, gs))
+    clctx = CLContext(ctx, queue, ifmt_f, gs, wgs)
+
+    # Compile the kernels
+    feats = cl.Program(ctx, features_cl()).build()
+    rdctn = cl.Program(ctx, reduction.reduction_sum_cl()).build()
+    blur2 = cl.Program(ctx, convolution.gaussian_cl([np.sqrt(2.0)]*4)).build()
+    blur4 = cl.Program(ctx, convolution.gaussian_cl([np.sqrt(4.0)]*4)).build()
+
+    iters = 500
+    t0 = time.time()
+    for i in range(iters):
+        get_features(clctx, feats, rdctn, blur2, blur4, bufi)
+    print((time.time() - t0)/iters)
+
 if __name__ == "__main__":
     print(features_cl())
     test()
+    #profile()
