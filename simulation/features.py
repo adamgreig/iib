@@ -111,11 +111,9 @@ def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1):
 
 
 def test():
-    import os.path
     import numpy as np
     import pyopencl as cl
     import matplotlib.pyplot as plt
-    from PIL import Image
     from skimage import io, data, transform
     from iib.simulation import convolution, reduction
 
@@ -151,7 +149,6 @@ def test():
     bufb = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
     bufc = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
     bufd = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
-    bufe = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
 
     cl.enqueue_copy(queue, bufi, sigs, origin=(0, 0), region=(gs, gs))
 
