@@ -1,4 +1,5 @@
 import numpy as np
+import pyopencl as cl
 
 
 reduction_cl_str = """//CL//
@@ -23,34 +24,38 @@ def reduction_sum_cl():
     return reduction_cl_str
 
 
-def run_reduction(kernel, queue, gs, wgs, buf_in, buf1, buf2):
+def run_reduction(clctx, kernel, buf_in):
+    """Run *kernel* on *buf_in* repeatedly and return the single result."""
+    mf = cl.mem_flags
+    gs, wgs = clctx.gs, clctx.wgs
+    buf1 = cl.Image(clctx.ctx, mf.READ_WRITE, clctx.ifmt, (gs, gs))
+    buf2 = cl.Image(clctx.ctx, mf.READ_WRITE, clctx.ifmt, (gs, gs))
     for i in range(1, int(np.log2(gs) + 1)):
         sgs = gs // (2**i)
         swg = wgs if wgs < sgs else sgs
         bufa = buf_in if i == 1 else (buf1 if i % 2 == 0 else buf2)
         bufb = buf2 if i % 2 == 0 else buf1
-        kernel(queue, (sgs, sgs), (swg, swg), bufa, bufb)
-    return bufb
+        kernel(clctx.queue, (sgs, sgs), (swg, swg), bufa, bufb)
+    result = np.empty(4, np.float32)
+    cl.enqueue_copy(clctx.queue, result, bufb, origin=(0, 0), region=(1, 1))
+    buf1.release()
+    buf2.release()
+    return result
 
 
 def test():
-    import numpy as np
-    import pyopencl as cl
+    from iib.simulation import CLContext
     gs, wgs = 512, 16
     sigs = np.ones((gs, gs, 4), np.float32).reshape(gs*gs*4)
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     program = cl.Program(ctx, reduction_sum_cl()).build()
-    ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
-    ibuf_in = cl.Image(ctx, mf.READ_ONLY, ifmt_f, (gs, gs))
-    ibuf_a = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
-    ibuf_b = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (gs, gs))
+    ifmt = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
+    ibuf_in = cl.Image(ctx, mf.READ_ONLY, ifmt, (gs, gs))
+    clctx = CLContext(ctx, queue, ifmt, gs, wgs)
     cl.enqueue_copy(queue, ibuf_in, sigs, origin=(0, 0), region=(gs, gs))
-    run_reduction(program.reduction_sum, queue, gs, wgs,
-                  ibuf_in, ibuf_a, ibuf_b)
-    cl.enqueue_copy(queue, sigs, ibuf_a, origin=(0, 0), region=(1, 1))
-    print(sigs[:4])
+    print(run_reduction(clctx, program.reduction_sum, ibuf_in))
 
 if __name__ == "__main__":
     print(reduction_sum_cl())
