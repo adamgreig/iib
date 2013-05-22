@@ -23,12 +23,12 @@ def reduction_sum_cl():
     return reduction_cl_str
 
 
-def run_reduction(kernel, queue, gs, wgs, buf_in, buf2, buf3):
+def run_reduction(kernel, queue, gs, wgs, buf_in, buf1, buf2):
     for i in range(1, int(np.log2(gs) + 1)):
         sgs = gs // (2**i)
         swg = wgs if wgs < sgs else sgs
-        bufa = buf_in if i == 1 else (buf2 if i % 2 == 0 else buf3)
-        bufb = buf3 if i % 2 == 0 else buf2
+        bufa = buf_in if i == 1 else (buf1 if i % 2 == 0 else buf2)
+        bufb = buf2 if i % 2 == 0 else buf1
         kernel(queue, (sgs, sgs), (swg, swg), bufa, bufb)
     return bufb
 
