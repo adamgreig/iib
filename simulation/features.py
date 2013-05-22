@@ -6,8 +6,25 @@ features_cl_str = """//CL//
 __constant sampler_t esampler = CLK_NORMALIZED_COORDS_FALSE |
                                 CLK_ADDRESS_CLAMP_TO_EDGE   |
                                 CLK_FILTER_NEAREST;
-__kernel void edges(__read_only  image2d_t imgin1,
-                    __read_only  image2d_t imgin2,
+__kernel void subtract(__read_only  image2d_t a,
+                       __read_only  image2d_t b,
+                       __write_only image2d_t imgout)
+{
+    __private int2   p  = (int2)(get_global_id(0), get_global_id(1));
+    __private float4 av = read_imagef(a, p);
+    __private float4 bv = read_imagef(b, p);
+    write_imagef(imgout, p, av - bv);
+}
+
+__kernel void subsample(__read_only image2d_t in, __write_only image2d_t out)
+{
+    __private ushort x = get_global_id(0);
+    __private ushort y = get_global_id(1);
+    __private float4 v = read_imagef(in, esampler, (int2)(x*2, y*2));
+    write_imagef(out, (int2)(x, y), v);
+}
+
+__kernel void edges(__read_only  image2d_t l1,
                     __write_only image2d_t imgout)
 {
     __private ushort x = get_global_id(0);
@@ -16,7 +33,7 @@ __kernel void edges(__read_only  image2d_t imgin1,
     __private float4 lmin = (float4)(INFINITY), lmax = (float4)(-INFINITY);
     __private float4 val;
 
-    $minmax12
+    $minmax1
 
     val.s0 = lmin.s0 < -ETH && lmax.s0 > ETH ? 1.0f : 0.0f;
     val.s1 = lmin.s1 < -ETH && lmax.s1 > ETH ? 1.0f : 0.0f;
@@ -27,10 +44,9 @@ __kernel void edges(__read_only  image2d_t imgin1,
 
 }
 
-__kernel void blobs(__read_only  image2d_t imgin1,
-                    __read_only  image2d_t imgin2,
-                    __read_only  image2d_t imgin3,
-                    __read_only  image2d_t imgin4,
+__kernel void blobs(__read_only  image2d_t l0,
+                    __read_only  image2d_t l1,
+                    __read_only  image2d_t l2,
                     __write_only image2d_t imgout)
 {
     __private ushort x = get_global_id(0);
@@ -39,12 +55,11 @@ __kernel void blobs(__read_only  image2d_t imgin1,
     __private float4 lmin = (float4)(INFINITY), lmax = (float4)(-INFINITY);
     __private float4 val;
 
-    $minmax12
-    $minmax23
-    $minmax34
+    $minmax0
+    $minmax1
+    $minmax2
 
-    __private float4 v = read_imagef(imgin2, esampler, (int2)(x, y)) -
-                         read_imagef(imgin3, esampler, (int2)(x, y));
+    __private float4 v = read_imagef(l1, esampler, (int2)(x, y));
 
     if((v.s0 < lmin.s0 && v.s0 < -BTH) || (v.s0 > lmax.s0 && v.s0 > BTH))
         val.s0 = 1.0f; else val.s0 = 0.0f;
@@ -61,41 +76,38 @@ __kernel void blobs(__read_only  image2d_t imgin1,
 
 
 def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1):
-    lines12, lines23, lines34 = [], [], []
-    val12a = "val = read_imagef(imgin1, esampler, (int2)(x{0:+d}, y{1:+d})) -"
-    val12b = "      read_imagef(imgin2, esampler, (int2)(x{0:+d}, y{1:+d}));"
-    val23a = "val = read_imagef(imgin2, esampler, (int2)(x{0:+d}, y{1:+d})) -"
-    val23b = "      read_imagef(imgin3, esampler, (int2)(x{0:+d}, y{1:+d}));"
-    val34a = "val = read_imagef(imgin3, esampler, (int2)(x{0:+d}, y{1:+d})) -"
-    val34b = "      read_imagef(imgin4, esampler, (int2)(x{0:+d}, y{1:+d}));"
+    lines0, lines1, lines2 = [], [], []
+    val0 = "val = read_imagef(l0, esampler, (int2)((x{0:+d})*2, (y{1:+d})*2));"
+    val1 = "val = read_imagef(l1, esampler, (int2)(x{0:+d}, y{1:+d}));"
+    val2 = "val = read_imagef(l2, esampler, (int2)((x{0:+d})/2, (y{1:+d})/2));"
     minl = "lmin = min(lmin, val);"
     maxl = "lmax = max(lmax, val);"
     for u in reversed(range(-width, width+1)):
         for v in reversed(range(-width, width+1)):
-            lines12.append(val12a.format(u, v))
-            lines12.append(val12b.format(u, v))
-            lines12.append(minl)
-            lines12.append(maxl)
+            lines0.append(val0.format(u, v))
+            lines0.append(val0.format(u, v))
+            lines0.append(minl)
+            lines0.append(maxl)
             if not (u == 0 and v == 0):
-                lines23.append(val23a.format(u, v))
-                lines23.append(val23b.format(u, v))
-                lines23.append(minl)
-                lines23.append(maxl)
-            lines34.append(val34a.format(u, v))
-            lines34.append(val34b.format(u, v))
-            lines34.append(minl)
-            lines34.append(maxl)
-    lines12 = '\n    '.join(lines12)
-    lines23 = '\n    '.join(lines23)
-    lines34 = '\n    '.join(lines34)
+                lines1.append(val1.format(u, v))
+                lines1.append(val1.format(u, v))
+                lines1.append(minl)
+                lines1.append(maxl)
+            lines2.append(val2.format(u, v))
+            lines2.append(val2.format(u, v))
+            lines2.append(minl)
+            lines2.append(maxl)
+    lines0 = '\n    '.join(lines0)
+    lines1 = '\n    '.join(lines1)
+    lines2 = '\n    '.join(lines2)
     eth = "{0:0.4f}f".format(edge_threshold)
     bth = "{0:0.4f}f".format(blob_threshold)
 
     return Template(features_cl_str).substitute(edge_threshold=eth,
                                                 blob_threshold=bth,
-                                                minmax12=lines12,
-                                                minmax23=lines23,
-                                                minmax34=lines34)
+                                                minmax0=lines0,
+                                                minmax1=lines1,
+                                                minmax2=lines2)
 
 
 def test():
@@ -122,9 +134,7 @@ def test():
     sigs = sigs.reshape(gs*gs*4)
 
     edges = np.empty((gs, gs, 4), np.float32)
-    blobs = np.empty((10, gs, gs, 4), np.float32)
     count = np.empty(4, np.float32)
-    space = np.empty((13, gs, gs, 4), np.float32)
 
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
@@ -149,40 +159,64 @@ def test():
     blur4.convolve_y(queue, (gs, gs), (wgs, wgs), bufb, bufa)  # bufa t=2
     blur4.convolve_x(queue, (gs, gs), (wgs, wgs), bufa, bufc)
     blur4.convolve_y(queue, (gs, gs), (wgs, wgs), bufc, bufb)  # bufb t=4
-    feats.edges(queue, (gs, gs), (wgs, wgs), bufa, bufb, bufc)
-    cl.enqueue_copy(queue, edges, bufc, origin=(0, 0), region=(gs, gs))
+    feats.subtract(queue, (gs, gs), (wgs, wgs), bufb, bufa, bufc)  # c = b - a
+    feats.edges(queue, (gs, gs), (wgs, wgs), bufc, bufd)  # d = edges
+    cl.enqueue_copy(queue, edges, bufd, origin=(0, 0), region=(gs, gs))
 
     bufo = reduction.run_reduction(rdctn.reduction_sum, queue, gs, wgs,
-                                   bufc, bufd, bufe)
+                                   bufd, bufa, bufb)  # a, b dirty, o = counts
     cl.enqueue_copy(queue, count, bufo, origin=(0, 0), region=(1, 1))
     print("Edge pixel counts:", count[:4])
 
-    cl.enqueue_copy(queue, bufd, bufi, src_origin=(0, 0), dest_origin=(0, 0),
+    blobs = []
+    space = []
+    cl.enqueue_copy(queue, bufa, bufi, src_origin=(0, 0), dest_origin=(0, 0),
                     region=(gs, gs))
-    buf1, buf2, buf3, buf4 = bufd, bufa, bufb, bufc
-    cl.enqueue_copy(queue, space[0], buf1, origin=(0, 0), region=(gs, gs))
-    cl.enqueue_copy(queue, space[1], buf2, origin=(0, 0), region=(gs, gs))
-    cl.enqueue_copy(queue, space[2], buf3, origin=(0, 0), region=(gs, gs))
-    for i in range(10):
-        for j in range(3**i):
-            bufu = buf3 if j % 2 == 0 else buf4
-            bufv = buf4 if j % 2 == 0 else buf3
-            blur2.convolve_x(queue, (gs, gs), (wgs, wgs), bufu, bufe)
-            blur2.convolve_y(queue, (gs, gs), (wgs, wgs), bufe, bufv)
-        feats.blobs(queue, (gs, gs), (wgs, wgs), buf4, buf3, buf2, buf1, bufe)
-        cl.enqueue_copy(queue, blobs[i], bufe, origin=(0, 0), region=(gs, gs))
-        cl.enqueue_copy(queue, space[i+3], buf4,
-                        origin=(0, 0), region=(gs, gs))
-        buf1, buf2, buf3, buf4 = buf2, buf3, buf4, buf1
+    l_prev, l_curr, g_prev = bufc, bufb, bufa
+    for i in range(7):
+        # Prepare next layer
+        d = gs // (2**i)
+        swg = wgs if wgs <= d else d
+        g_blurr = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
+        g_temp = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
+        l_next = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
+        blur2.convolve_x(queue, (d, d), (swg, swg), g_prev, g_temp)
+        blur2.convolve_y(queue, (d, d), (swg, swg), g_temp, g_blurr)
+        feats.subtract(queue, (d, d), (swg, swg), g_blurr, g_prev, l_next)
+        space.append(np.empty((d, d, 4), np.float32))
+        cl.enqueue_copy(queue, space[-1], l_next, origin=(0, 0), region=(d, d))
 
-    #for i in range(1, 12):
+        # Find blobs in current layer
+        if i >= 2:
+            d = gs // (2**(i-1))
+            swg = wgs if wgs <= d else d
+            out = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
+            feats.blobs(queue, (d, d), (swg, swg), l_prev, l_curr, l_next, out)
+            blobs.append(np.empty((d, d, 4), np.float32))
+            cl.enqueue_copy(queue, blobs[-1], out,
+                            origin=(0, 0), region=(d, d))
+            out.release()
+
+        # Resize current layer to start the next layer
+        d = gs // (2**(i+1))
+        swg = wgs if wgs <= d else d
+        g_resize = cl.Image(ctx, mf.READ_WRITE, ifmt_f, (d, d))
+        feats.subsample(queue, (d, d), (swg, swg), g_blurr, g_resize)
+
+        # Cycle through buffers
+        g_blurr.release()
+        g_temp.release()
+        g_prev.release()
+        l_prev.release()
+        g_prev = g_resize
+        l_prev = l_curr
+        l_curr = l_next
+
+    #for i in range(6):
     if False:
-        plt.subplot(4, 3, i+1)
-        im1 = space[i-1, :, :, 3]
-        im2 = space[i, :, :, 3]
-        im = im2 - im1
-        print(np.min(im), np.max(im))
-        plt.imshow(im, cmap="gray")
+        sspace = space[i]
+        plt.subplot(2, 3, i+1)
+        plt.imshow(sspace[:, :, 3], cmap="gray")
         plt.xticks([])
         plt.yticks([])
 
@@ -206,11 +240,12 @@ def test():
         plt.imshow(img, cmap="gray")
         plt.xticks([])
         plt.yticks([])
-        for j in range(2, 5):
-            t = 3 + 3**j
-            r = np.sqrt(2.0 * t)
-            im = blobs[j, :, :, i]
-            posns = np.transpose(im.nonzero())
+        for j in range(len(blobs)):
+            sblobs = blobs[j]
+            s = 2**(j+1)
+            r = np.sqrt(2.0) * s
+            im = sblobs[:, :, i]
+            posns = np.transpose(im.nonzero()) * 2**(j+1)
             for xy in posns:
                 circ = plt.Circle((xy[1], xy[0]), r, color="green", fill=False)
                 ax.add_patch(circ)
