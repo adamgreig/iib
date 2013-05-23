@@ -45,6 +45,7 @@ def dump_colour_image(clctx, colours, bufi, channel, fpath):
     img = img.reshape((gs, gs, 4))
     img = Image.fromarray(img)
     img.save(fpath)
+    buf.release()
 
 
 def test():
