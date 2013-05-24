@@ -40,7 +40,7 @@ def process(config):
     mask[:, sigs_used] = 0
     score = np.ma.masked_array(scores, mask).mean()
 
-    return score
+    return float(score)
 
 
 def rq_job(generation, genome=None, initial=None, config=None):
@@ -53,7 +53,7 @@ def rq_job(generation, genome=None, initial=None, config=None):
             cfg["signals"][4:] = [{"diffusion": 0.0, "initial": initial}]*4
     else:
         cfg = config
-    return process(config)
+    return process(cfg)
 
 standard_config = {
     "grid_size": 256,
