@@ -1,20 +1,6 @@
-from iib.simulation import run, genome as sim_genome
-from iib.scoring import score
+from iib.simulation import run
 
 import copy
-
-
-def process(config):
-    signals = run.run_simulation(config)
-    genes_used = sim_genome.get_used_genes(config["genome"])
-    scores = score.score(signals, genes_used)
-    return scores
-
-
-def process_genome(genome):
-    cfg = copy.copy(standard_config)
-    cfg["genome"] = genome
-    return process(cfg)
 
 
 def rq_job(generation, genome=None, initial=None, config=None):
@@ -24,35 +10,29 @@ def rq_job(generation, genome=None, initial=None, config=None):
         cfg = copy.deepcopy(standard_config)
         cfg["genome"] = genome
         if initial:
-            cfg["signals"][10:] = [{"diffusion": 0.0, "initial": initial}]*6
+            cfg["signals"][4:] = [{"diffusion": 0.0, "initial": initial}]*4
     else:
         cfg = config
-    return process(cfg)
+    return run.run_simulation(config)
 
 standard_config = {
-    "grid_size": 512,
-    "wg_size": 128,
+    "grid_size": 256,
     "iterations": 100,
+    "early_stop": True,
     "signals": [
         {"diffusion": 1.0, "initial": 0.0},
         {"diffusion": 1.0, "initial": 0.0},
-        {"diffusion": 1.5, "initial": 0.0},
-        {"diffusion": 1.5, "initial": 0.0},
-        {"diffusion": 2.0, "initial": 0.0},
-        {"diffusion": 2.0, "initial": 0.0},
-        {"diffusion": 3.0, "initial": 0.0},
         {"diffusion": 3.0, "initial": 0.0},
         {"diffusion": 5.0, "initial": 0.0},
-        {"diffusion": 5.0, "initial": 0.0},
-        {"diffusion": 0.0, "initial": "random_float"},
-        {"diffusion": 0.0, "initial": "random_float"},
-        {"diffusion": 0.0, "initial": "random_float"},
-        {"diffusion": 0.0, "initial": "random_float"},
-        {"diffusion": 0.0, "initial": "random_float"},
-        {"diffusion": 0.0, "initial": "random_float"}
+        {"initial": "random_float", "initial_scale": 0.2},
+        {"initial": "random_float", "initial_scale": 0.2},
+        {"initial": "random_float", "initial_scale": 0.2},
+        {"initial": "random_float", "initial_scale": 0.2},
     ]
 }
 
 
 if __name__ == "__main__":
-    print(process_genome("+A3A3+A563-62A2"))
+    cfg = copy.copy(standard_config)
+    cfg["genome"] = "+4303+4513-1242"
+    print(run.run_simulation(cfg))
