@@ -57,17 +57,18 @@ def new_child(parents):
 
 def new_generation(old):
     """Create a new generation from *old* of the same size."""
-    n_parents = len(old) / 10
+    n_parents = len(old) // 10
+    n_elites = len(old) // 100
     parents = select_parents(n_parents, old)
-    children = []
+    elites = select_parents(n_elites, old)
     results = []
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    for _ in range(len(old)):
+    for _ in range(len(old) - n_elites):
         results.append(pool.apply_async(new_child, [parents]))
     pool.close()
     pool.join()
     children = [result.get() for result in results]
-    return children
+    return elites + children
 
 
 if __name__ == "__main__":

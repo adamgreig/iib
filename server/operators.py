@@ -105,4 +105,9 @@ def crossover_replace(parents):
     return ''.join(genes_a)
 
 
-crossovers = [crossover_concatenate, crossover_replace]
+def crossover_pickone(parents):
+    """Just go with one parent."""
+    return random.choice(parents)
+
+
+crossovers = [crossover_concatenate, crossover_replace, crossover_pickone]
