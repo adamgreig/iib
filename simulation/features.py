@@ -81,37 +81,43 @@ __kernel void entropy(__read_only image2d_t in, __write_only image2d_t out)
 {
     __private ushort x = get_global_id(0);
     __private ushort y = get_global_id(1);
+    __private ushort w0 = get_local_size(0);
+    __private ushort w1 = get_local_size(1);
+    __local uint hist_s0[256];
+    __local uint hist_s1[256];
+    __local uint hist_s2[256];
+    __local uint hist_s3[256];
 
-    __private float4 val;
-    __private uchar4 hist[128];
-    __private ushort i;
+    __private float wgss = convert_float(w0 * w1);
+    __private ushort idx = get_local_id(0) * w0 + get_local_id(1);
+    __private float4 val = 256.0f * read_imagef(in, esampler, (int2)(x, y));
 
-    for(i=0; i<128; i++)
-        hist[i] = (uchar4)(0);
+    hist_s0[idx] = 0;
+    hist_s1[idx] = 0;
+    hist_s2[idx] = 0;
+    hist_s3[idx] = 0;
 
-    $countvals
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    atomic_inc(&(hist_s0[convert_uchar(val.s0)]));
+    atomic_inc(&(hist_s1[convert_uchar(val.s1)]));
+    atomic_inc(&(hist_s2[convert_uchar(val.s2)]));
+    atomic_inc(&(hist_s3[convert_uchar(val.s3)]));
+
+    barrier(CLK_LOCAL_MEM_FENCE);
 
     __private float4 entropy = (float4)(0.0f);
-    __private float sumf = (float)($enp);
     __private float p;
-    for(i=0; i<128; i++) {
-        if(hist[i].s0 > 0) {
-            p = (float)(hist[i].s0) / sumf;
-            entropy.s0 -= p * native_log2(p);
-        }
-        if(hist[i].s1 > 0) {
-            p = (float)(hist[i].s1) / sumf;
-            entropy.s1 -= p * native_log2(p);
-        }
-        if(hist[i].s2 > 0) {
-            p = (float)(hist[i].s2) / sumf;
-            entropy.s2 -= p * native_log2(p);
-        }
-        if(hist[i].s3 > 0) {
-            p = (float)(hist[i].s3) / sumf;
-            entropy.s3 -= p * native_log2(p);
-        }
-    }
+
+    // avoid branching for the p=0 case by making p very very small
+    p = ((float)(hist_s0[idx]) / wgss) + 0.000001f;
+    entropy.s0 = -p * native_log2(p);
+    p = ((float)(hist_s1[idx]) / wgss) + 0.000001f;
+    entropy.s1 = -p * native_log2(p);
+    p = ((float)(hist_s2[idx]) / wgss) + 0.000001f;
+    entropy.s2 = -p * native_log2(p);
+    p = ((float)(hist_s3[idx]) / wgss) + 0.000001f;
+    entropy.s3 = -p * native_log2(p);
 
     write_imagef(out, (int2)(x, y), entropy);
 }
@@ -150,24 +156,11 @@ def features_cl(edge_threshold=0.01, blob_threshold=0.03, width=1, ew=3):
     eth = "{0:0.4f}f".format(edge_threshold)
     bth = "{0:0.4f}f".format(blob_threshold)
 
-    countlines = []
-    c1 = "val = 128.0f * read_imagef(in, esampler, (int2)(x{0:+d}, y{1:+d}));"
-    c2 = "hist[convert_uchar(val.s0)].s0++; hist[convert_uchar(val.s1)].s1++;"
-    c3 = "hist[convert_uchar(val.s2)].s2++; hist[convert_uchar(val.s3)].s3++;"
-    for u in reversed(range(-ew, ew+1)):
-        for v in reversed(range(-ew, ew+1)):
-            countlines.append(c1.format(u, v))
-            countlines.append(c2)
-            countlines.append(c3)
-    countlines = '\n    '.join(countlines)
-
     return Template(features_cl_str).substitute(edge_threshold=eth,
                                                 blob_threshold=bth,
                                                 minmax0=lines0,
                                                 minmax1=lines1,
-                                                minmax2=lines2,
-                                                countvals=countlines,
-                                                enp=(2*ew + 1)**2)
+                                                minmax2=lines2)
 
 
 def get_variance(clctx, features, reductions, buf_in):
@@ -190,7 +183,7 @@ def get_entropy(clctx, features, reductions, buf_in):
     buf = cl.Image(clctx.ctx, cl.mem_flags.READ_WRITE, clctx.ifmt, (gs, gs))
     features.entropy(clctx.queue, (gs, gs), (wgs, wgs), buf_in, buf)
     entropy = reduction.run_reduction(clctx, reductions.reduction_sum, buf)
-    entropy /= (gs * gs)
+    entropy /= ((gs * gs) / (wgs * wgs))
     buf.release()
     return entropy
 
@@ -326,6 +319,8 @@ def test():
                                 as_grey=True), (gs, gs))
     sigs[:, :, 3] = io.imread("../scoring/corpus/synthetic/blobs.png",
                               as_grey=True)
+    #sq = np.arange(256).astype(np.float32).reshape((16, 16)) / 255.0
+    #sigs[:, :, 0] = np.tile(sq, (16, 16))
     sigs = sigs.reshape(gs*gs*4)
 
     # Set up OpenCL
