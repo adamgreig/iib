@@ -1,13 +1,9 @@
-from iib.simulation import colour
-from iib.simulation import genome
-from iib.simulation import reduction
-from iib.simulation import convolution
+from iib.simulation import colour, genome, features, reduction, convolution
+from iib.simulation import CLContext
 
 import os.path
 import numpy as np
 import pyopencl as cl
-
-from PIL import Image
 
 
 def set_up_signals(config):
@@ -35,24 +31,44 @@ def set_up_signals(config):
         if 'initial_offset' in signal:
             sigs[:, :, idx] += signal['initial_offset']
 
+    return sigs
 
-def assemble_progstr(config):
+
+def build_programs(clctx, config):
     sigmas = [s['diffusion'] for s in config['signals'][:4]]
-    progstr = genome.genome_cl(config['genome'])
-    progstr += convolution.gaussian_cl(sigmas)
-    progstr += reduction.reduction_add_cl()
-    if config.get('dump_images') or config.get('dump_final_image'):
-        progstr += colour.colour_cl()
-    return progstr
+    colony = genome.genome_cl(config['genome'])
+    colony += convolution.gaussian_cl(sigmas)
+    colony = cl.Program(clctx.ctx, colony).build()
+    feats = cl.Program(clctx.ctx, features.features_cl()).build()
+    sigma2, sigma4 = [np.sqrt(2.0)] * 4, [2.0] * 4
+    blurs2 = cl.Program(clctx.ctx, convolution.gaussian_cl(sigma2)).build()
+    blurs4 = cl.Program(clctx.ctx, convolution.gaussian_cl(sigma4)).build()
+    rdctns = cl.Program(clctx.ctx, reduction.reduction_sum_cl()).build()
+    colours = cl.Program(clctx.ctx, colour.colour_cl()).build()
+    return colony, feats, blurs2, blurs4, rdctns, colours
+
+
+def dump_image(clctx, colours, ibuf_1a, ibuf_1b, s, iteration, prefix=None):
+    ibuf, ls = (ibuf_1a, s) if s < 4 else (ibuf_1b, s - 4)
+    fpath = os.path.dirname(os.path.abspath(__file__))
+    sstr = "{0:X}".format(s)
+    if prefix:
+        sstr = "{0}_{1}".format(prefix, sstr)
+    path = fpath + "/output/{0}_{1:05d}.png".format(sstr, iteration)
+    colour.dump_colour_image(clctx, colours, ibuf, ls, path)
 
 
 def run_simulation(config):
     ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
+    ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
     gs = config['grid_size']
+    wgs = 16
+    clctx = CLContext(ctx, queue, ifmt_f, gs, wgs)
     sigs = set_up_signals(config)
-    program = cl.Program(ctx, assemble_progstr()).build()
+    colony, feats, blurs2, blurs4, rdctns, colours = build_programs(clctx,
+                                                                    config)
 
     sigs_a = sigs[:, :, :4].reshape(gs*gs*4)
     sigs_b = sigs[:, :, 4:].reshape(gs*gs*4)
@@ -64,59 +80,43 @@ def run_simulation(config):
     cl.enqueue_copy(queue, ibuf_1a, sigs_a, origin=(0, 0), region=(gs, gs))
     cl.enqueue_copy(queue, ibuf_1b, sigs_b, origin=(0, 0), region=(gs, gs))
 
-    if config.get('dump_images') or config.get('dump_final_image'):
-        image_out = np.empty(gs*gs*4, np.uint8)
-        c_order, c_type = cl.channel_order.RGBA, cl.channel_type.UNORM_INT8
-        ifmt_u = cl.ImageFormat(c_order, c_type)
-        ibuf_o = cl.Image(ctx, mf.WRITE_ONLY, ifmt_u, (gs, gs))
-
-        def dump_image(s, iteration, prefix=None):
-            if s < 4:
-                ibuf, bsig = ibuf_1a, str(chr(s)).encode()
-            else:
-                ibuf, bsig = ibuf_1b, str(chr(s-4)).encode()
-            program.colour(queue, (gs, gs), (16, 16), ibuf, bsig, ibuf_o)
-            cl.enqueue_copy(
-                queue, image_out, ibuf_o, origin=(0, 0), region=(gs, gs))
-            img = Image.fromarray(image_out.reshape((gs, gs, 4)))
-            fpath = os.path.dirname(os.path.abspath(__file__))
-            s = "{0:X}".format(s)
-            if prefix:
-                s = "{0}_{1}".format(prefix, s)
-            path = fpath + "/output/{0}_{1:05d}.png".format(s, iteration)
-            img.save(path)
-
-    if config.get('dump_images'):
-        for i in config.get('dump_images'):
-            dump_image(i, 0)
+    for i in config.get('dump_images', []):
+        dump_image(clctx, colours, ibuf_1a, ibuf_1b, i, 0)
 
     n_iters = config['iterations']
+    feature_v = np.zeros((n_iters, 8, 4), np.float32)
     for iteration in range(n_iters):
-        program.genome(queue, (gs, gs), (16, 16),
-                       ibuf_1a, ibuf_1b, ibuf_2a, ibuf_2b)
-        program.convolve_x(queue, (gs, gs), (16, 16), ibuf_2a, ibuf_1a)
-        program.convolve_y(queue, (gs, gs), (16, 16), ibuf_1a, ibuf_2a)
+        colony.genome(queue, (gs, gs), (wgs, wgs),
+                      ibuf_1a, ibuf_1b, ibuf_2a, ibuf_2b)
+        colony.convolve_x(queue, (gs, gs), (wgs, wgs), ibuf_2a, ibuf_1a)
+        colony.convolve_y(queue, (gs, gs), (wgs, wgs), ibuf_1a, ibuf_2a)
         ibuf_1a, ibuf_2a = ibuf_2a, ibuf_1a
         ibuf_1b, ibuf_2b = ibuf_2b, ibuf_1b
 
-        if config.get('dump_images'):
-            for i in config.get('dump_images'):
-                dump_image(i, iteration+1)
+        feature_v[iteration] = features.get_features(
+            clctx, feats, rdctns, blurs2, blurs4, ibuf_1b)
+
+        for i in config.get('dump_images', []):
+            dump_image(clctx, colours, ibuf_1a, ibuf_1b, i, iteration+1)
+
+        if config.get('early_stop') and iteration > 1:
+            d = np.max(np.abs(feature_v[iteration] - feature_v[iteration - 1]))
+            if d < 0.001:
+                break
 
     if config.get('dump_final_image'):
         for i in genome.get_used_genes(config["genome"]):
-            dump_image(i, iteration+1, config["genome"])
-    cl.enqueue_copy(queue, sigs_a, ibuf_1a, origin=(0, 0), region=(gs, gs))
-    cl.enqueue_copy(queue, sigs_b, ibuf_1b, origin=(0, 0), region=(gs, gs))
-    sigs[:, :, :4] = sigs_a.reshape((gs, gs, 4))
-    sigs[:, :, 4:] = sigs_b.reshape((gs, gs, 4))
-    return sigs
+            dump_image(clctx, colours, ibuf_1a, ibuf_1b,
+                       i, iteration+1, config["genome"])
+
+    return iteration, feature_v
 
 
 test_config = {
     "grid_size": 256,
     "iterations": 100,
     "genome": "+4303+4513-1242",
+    "early_stop": True,
     "signals": [
         {"diffusion": 1.0, "initial": 0.0},
         {"diffusion": 1.0, "initial": 0.0},
@@ -131,5 +131,37 @@ test_config = {
 }
 
 
+def profile():
+    import time
+    from copy import deepcopy
+    cfg = deepcopy(test_config)
+    cfg['early_stop'] = False
+    cfg['dump_images'] = []
+    iters = 30
+    t0 = time.time()
+    for i in range(iters):
+        run_simulation(cfg)
+    print((time.time() - t0)/iters)
+
+
+def test():
+    import matplotlib.pyplot as plt
+    print("Running simulation...")
+    itercount, fvs = run_simulation(test_config)
+    fvs = fvs[:itercount, :, 0]
+    print("Ran for {0} iterations.".format(itercount))
+    names = ["edges", "blobs", "variance", "entropy"]
+    blobs = np.sum(fvs[:, 1:6], axis=1)
+    fvs = np.vstack((fvs[:, 0], blobs, fvs[:, 6], fvs[:, 7])).T
+    for i in range(4):
+        fvs[:, i] /= np.max(fvs[:, i])
+        plt.plot(fvs[:, i], label=names[i])
+    plt.legend()
+    plt.title("Feature Vector Evolution ({0})".format(test_config['genome']))
+    plt.ylabel("Normalised Value")
+    plt.xlabel("Iteration")
+    plt.show()
+
 if __name__ == "__main__":
-    print(run_simulation(test_config))
+    #profile()
+    test()
