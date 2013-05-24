@@ -33,9 +33,9 @@ def process(config):
 
     # Take the average weight of the genomes in use
     sigs_used = np.array(genome.get_used_genes(config["genome"]))
+    sigs_used = sigs_used[sigs_used >= 4] - 4
     if sigs_used.size == 0:
         return 0.0
-    sigs_used = sigs_used[sigs_used >= 4] - 4
     mask = np.ones_like(scores).astype(np.bool)
     mask[:, sigs_used] = 0
     score = np.ma.masked_array(scores, mask).mean()
