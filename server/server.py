@@ -1,11 +1,24 @@
 import time
+import logging
 import sqlite3
-import datetime
+import numpy as np
 from rq import Queue, use_connection
 from rq.job import Job
 from redis import Redis
 
 from iib.server import evolution
+from iib.server.notify import send_message
+
+
+logger = logging.getLogger('iib')
+logger.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+fh = logging.FileHandler("iib_server.log")
+formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(message)s")
+ch.setFormatter(formatter)
+fh.setFormatter(formatter)
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 
 def setup_db():
@@ -42,17 +55,15 @@ class Connections:
         self.sql_cur = sql_cur
 
 
-def queue_first_gen(conns):
+def queue_cohort(conns, gen, genomes):
     jobs = []
-    cohort_size = int(input("Enter initial cohort size: "))
-    cohort = evolution.first_generation(cohort_size)
-    print("Enqueing first generation jobs...")
-    for genome in cohort:
+    for genome in genomes:
         job = conns.q.enqueue_call(func='iib.client.process.rq_job',
-                                   kwargs={"generation": 1, "genome": genome},
+                                   kwargs={"generation": gen,
+                                           "genome": genome},
                                    result_ttl=-1)
         jobs.append(job)
-        save_task(conns, 1, job._id, genome)
+        save_task(conns, gen, job._id, genome)
     conns.sql_con.commit()
     return jobs
 
@@ -66,13 +77,18 @@ def fetch_jobs_from_gen(conns, gen):
     return jobs
 
 
+def fetch_results_from_gen(conns, gen):
+    conns.sql_cur.execute("SELECT genome, score FROM iib WHERE generation = ?",
+                          (gen,))
+    return conns.sql_cur.fetchall()
+
+
 def wait_for_gen(conns, gen):
-    print("Waiting for generation {0}...".format(gen))
+    logger.info("Waiting for generation %d...", gen)
     jobs = fetch_jobs_from_gen(conns, gen)
     saved_jobs = []
     t0 = time.time()
     while True:
-        time.sleep(5)
         finished = 0
         failed = 0
         started = 0
@@ -90,19 +106,26 @@ def wait_for_gen(conns, gen):
             elif job.is_queued:
                 queued += 1
 
-        ts = datetime.datetime.now().isoformat()
-        print("[{0}] generation {1}: {2} finished, {3} started, "
-              "{4} queued, {5} failed jobs"
-              .format(ts, gen, finished, started, queued, failed))
+        logger.info("generation %d: %d finished, %d started, "
+                    "%d queued, %d failed jobs",
+                    gen, finished, started, queued, failed)
 
-        if finished != len(jobs):
+        if finished == len(jobs):
+            logger.info("All jobs finished, proceeding...")
+            return
+        elif finished + failed == len(jobs):
+            logger.warn("All jobs finished or failed, proceeding...")
+            send_message("Failures", "Generation {0}".format(gen))
+            return
+        else:
             td = time.time() - t0
             if td > 600:
-                print("It's been ten minutes! Moving on with what we've got.")
+                logger.warn("It's been ten minutes! "
+                            "Moving on with what we've got.")
+                send_message("Timeout", "Generation {0}".format(gen))
                 return
-        else:
-            print("All jobs finished, proceeding...")
-            return
+
+        time.sleep(5)
 
 
 def main():
@@ -115,11 +138,25 @@ def main():
     gen = int(input("Enter current generation (0 to start from scratch): "))
 
     if gen == 0:
-        queue_first_gen(conns)
         gen = 1
+        cohort_size = int(input("Enter initial cohort size: "))
+        cohort = evolution.first_generation(cohort_size)
+        queue_cohort(conns, gen, cohort)
 
     while True:
         wait_for_gen(conns, gen)
+        old_cohort = fetch_results_from_gen(conns, gen)
+        highscore = np.max([i[1] for i in old_cohort])
+        logger.info("Generation complete. Max score: %.2f", highscore)
+        if gen % 10 == 0:
+            send_message(
+                "Generation Complete",
+                "Gen {0}, max score {1:.2f}".format(gen, highscore))
+        new_cohort = evolution.new_generation(old_cohort)
+        gen += 1
+        logger.info("Enqueueing tasks for generation %d...", gen)
+        queue_cohort(conns, gen, new_cohort)
+        logger.info("Tasks queued, waiting for completion...")
 
 
 if __name__ == "__main__":

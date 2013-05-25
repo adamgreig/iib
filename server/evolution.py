@@ -27,6 +27,8 @@ def select_parents(n, generation):
     """
     Use stochastic universal sampling to select *n* parents from *generation*.
     """
+    if n == 0:
+        return []
     generation = sorted(generation, key=lambda i: float(i[1]), reverse=True)
     scores = np.array([float(individual[1]) for individual in generation])
     scores /= np.sum(scores)
@@ -57,18 +59,20 @@ def new_child(parents):
 
 def new_generation(old):
     """Create a new generation from *old* of the same size."""
-    n_parents = len(old) // 10
-    n_elites = len(old) // 100
+    n_parents = max(2, len(old) // 10)
+    n_newbies = max(1, len(old) // 100)
+    n_elites = max(1, len(old) // 100)
     parents = select_parents(n_parents, old)
     elites = select_parents(n_elites, old)
+    newbies = first_generation(n_newbies)
     results = []
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    for _ in range(len(old) - n_elites):
+    for _ in range(len(old) - n_newbies - n_elites):
         results.append(pool.apply_async(new_child, [parents]))
     pool.close()
     pool.join()
     children = [result.get() for result in results]
-    return elites + children
+    return elites + children + newbies
 
 
 if __name__ == "__main__":
