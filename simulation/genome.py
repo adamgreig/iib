@@ -29,7 +29,7 @@ Gene = namedtuple('Gene', 'reg sig_in rbs sig_out deg')
 
 def get_used_genes(genestr):
     genes = parsegenes(genestr)
-    used = {int(s, 16) for sl in ((g[1], g[3]) for g in genes) for s in sl}
+    used = {int(s, 16) for sl in ((g[3],) for g in genes) for s in sl}
     return list(used)
 
 
