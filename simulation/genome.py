@@ -4,6 +4,9 @@ from string import Template
 genome_cl_str = """//CL//
 // A slightly leaky activation function that saturates at about x=1.0
 #define activation(x) native_recip(1.0f + native_exp(5.0f - 10.0f * x))
+__constant sampler_t gsampler = CLK_NORMALIZED_COORDS_FALSE |
+                                CLK_ADDRESS_CLAMP_TO_EDGE   |
+                                CLK_FILTER_NEAREST;
 
 __kernel void genome(__read_only  image2d_t sigs_in_a,
                      __read_only  image2d_t sigs_in_b,
@@ -12,8 +15,8 @@ __kernel void genome(__read_only  image2d_t sigs_in_a,
 {
     __private int2 pos = (int2)(get_global_id(0), get_global_id(1));
     __private float8 sigs;
-    sigs.lo = read_imagef(sigs_in_a, pos);
-    sigs.hi = read_imagef(sigs_in_b, pos);
+    sigs.lo = read_imagef(sigs_in_a, gsampler, pos);
+    sigs.hi = read_imagef(sigs_in_b, gsampler, pos);
 
     $degregation
 

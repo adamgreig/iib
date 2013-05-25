@@ -15,8 +15,8 @@ __kernel void subtract(__read_only  image2d_t a,
                        __write_only image2d_t imgout)
 {
     __private int2   p  = (int2)(get_global_id(0), get_global_id(1));
-    __private float4 av = read_imagef(a, p);
-    __private float4 bv = read_imagef(b, p);
+    __private float4 av = read_imagef(a, esampler, p);
+    __private float4 bv = read_imagef(b, esampler, p);
     write_imagef(imgout, p, av - bv);
 }
 
@@ -125,7 +125,7 @@ __kernel void entropy(__read_only image2d_t in, __write_only image2d_t out)
 __kernel void variance(__read_only image2d_t in, __write_only image2d_t out)
 {
     __private int2 p = (int2)(get_global_id(0), get_global_id(1));
-    __private float4 v = read_imagef(in, p);
+    __private float4 v = read_imagef(in, esampler, p);
     write_imagef(out, p, native_powr(v, (float4)(2.0f)));
 }
 """

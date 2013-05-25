@@ -3,6 +3,9 @@ import pyopencl as cl
 
 
 reduction_cl_str = """//CL//
+__constant sampler_t rsampler = CLK_NORMALIZED_COORDS_FALSE |
+                                CLK_ADDRESS_CLAMP_TO_EDGE   |
+                                CLK_FILTER_NEAREST;
 __kernel void reduction_sum(__read_only image2d_t imgin,
                             __write_only image2d_t imgout)
 {
@@ -10,10 +13,10 @@ __kernel void reduction_sum(__read_only image2d_t imgin,
     __private ushort y = get_global_id(1);
     __private float4 result;
 
-    result =  read_imagef(imgin, (int2)(x*2,   y*2));
-    result += read_imagef(imgin, (int2)(x*2+1, y*2));
-    result += read_imagef(imgin, (int2)(x*2+1, y*2+1));
-    result += read_imagef(imgin, (int2)(x*2,   y*2+1));
+    result =  read_imagef(imgin, rsampler, (int2)(x*2,   y*2));
+    result += read_imagef(imgin, rsampler, (int2)(x*2+1, y*2));
+    result += read_imagef(imgin, rsampler, (int2)(x*2+1, y*2+1));
+    result += read_imagef(imgin, rsampler, (int2)(x*2,   y*2+1));
 
     write_imagef(imgout, (int2)(x, y), result);
 }

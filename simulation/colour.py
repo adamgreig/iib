@@ -6,6 +6,9 @@ from string import Template
 
 colour_cl_str = """//CL//
 __constant float colour_lut[768] = { $colourlut };
+__constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE |
+                               CLK_ADDRESS_CLAMP_TO_EDGE   |
+                               CLK_FILTER_NEAREST;
 
 __kernel void colour(__read_only  image2d_t input, const uchar signal,
                      __write_only image2d_t output)
@@ -15,7 +18,7 @@ __kernel void colour(__read_only  image2d_t input, const uchar signal,
     __private uint idx;
     __private union { float arr[4]; float4 vec; } data;
 
-    data.vec = read_imagef(input, coord);
+    data.vec = read_imagef(input, sampler, coord);
     idx = (uint)(clamp(data.arr[signal], 0.0f, 1.0f) * 255.0f);
     colour.x = colour_lut[idx * 3    ];
     colour.y = colour_lut[idx * 3 + 1];
