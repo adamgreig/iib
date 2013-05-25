@@ -1,7 +1,6 @@
 import time
 import logging
 import sqlite3
-import numpy as np
 from rq import Queue, use_connection
 from rq.job import Job
 from redis import Redis
@@ -149,7 +148,7 @@ def main():
     while True:
         wait_for_gen(conns, gen)
         old_cohort = fetch_results_from_gen(conns, gen)
-        highscore = np.max([i[1] for i in old_cohort])
+        highscore = max(i[1] for i in old_cohort)
         logger.info("Generation complete. Max score: %.2f", highscore)
         if gen % 10 == 0:
             send_message(
