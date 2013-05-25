@@ -61,14 +61,14 @@ standard_config = {
     "early_stop": True,
     "weights": [.5, .2, .15, .075, .075],
     "signals": [
-        {"diffusion": 1.0, "initial": 0.0},
-        {"diffusion": 1.0, "initial": 0.0},
-        {"diffusion": 3.0, "initial": 0.0},
-        {"diffusion": 5.0, "initial": 0.0},
-        {"initial": "random_float", "initial_scale": 0.2},
-        {"initial": "random_float", "initial_scale": 0.2},
-        {"initial": "random_float", "initial_scale": 0.2},
-        {"initial": "random_float", "initial_scale": 0.2},
+        {"diffusion": 1.0, "initial": "random_float", "initial_scale": 0.2},
+        {"diffusion": 1.0, "initial": "random_float", "initial_scale": 0.2},
+        {"diffusion": 3.0, "initial": "random_float", "initial_scale": 0.2},
+        {"diffusion": 5.0, "initial": "random_float", "initial_scale": 0.2},
+        {"initial": 0.0},
+        {"initial": 0.0},
+        {"initial": 0.0},
+        {"initial": 0.0},
     ]
 }
 

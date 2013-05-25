@@ -118,14 +118,14 @@ test_config = {
     "genome": "+4303+4513-1242",
     "early_stop": True,
     "signals": [
-        {"diffusion": 1.0, "initial": 0.0},
-        {"diffusion": 1.0, "initial": 0.0},
-        {"diffusion": 3.0, "initial": 0.0},
-        {"diffusion": 5.0, "initial": 0.0},
-        {"initial": "random_binary"},
-        {"initial": "random_binary"},
-        {"initial": "random_binary"},
-        {"initial": "random_binary"},
+        {"diffusion": 1.0, "initial": "random_float", "initial_scale": 0.2},
+        {"diffusion": 1.0, "initial": "random_float", "initial_scale": 0.2},
+        {"diffusion": 3.0, "initial": "random_float", "initial_scale": 0.2},
+        {"diffusion": 5.0, "initial": "random_float", "initial_scale": 0.2},
+        {"initial": 0.0},
+        {"initial": 0.0},
+        {"initial": 0.0},
+        {"initial": 0.0},
     ],
     "dump_images": [0, 1, 4]
 }
