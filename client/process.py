@@ -24,7 +24,7 @@ def process(config):
     # normalise
     gs = config["grid_size"]
     iters = config["iterations"]
-    norms = np.array((iters, (gs**2)/2, (gs**2)/(26*4), 0.25, 8.0))
+    norms = np.array((iters, (gs**2)/2, (gs**2)/(26*4*5), 0.25, 8.0))
     norms = np.kron(norms, np.ones(4)).reshape(5, 4)
     fvs /= norms
 
@@ -59,7 +59,7 @@ standard_config = {
     "grid_size": 256,
     "iterations": 100,
     "early_stop": True,
-    "weights": [.5, .2, .15, .075, .075],
+    "weights": [.3, .2, .3, .1, .1],
     "signals": [
         {"diffusion": 1.0, "initial": "random_float", "initial_scale": 0.2},
         {"diffusion": 1.0, "initial": "random_float", "initial_scale": 0.2},
