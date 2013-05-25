@@ -88,6 +88,7 @@ def wait_for_gen(conns, gen):
     jobs = fetch_jobs_from_gen(conns, gen)
     saved_jobs = []
     t0 = time.time()
+    old_finished = 0
     while True:
         finished = 0
         failed = 0
@@ -118,13 +119,15 @@ def wait_for_gen(conns, gen):
             send_message("Failures", "Generation {0}".format(gen))
             return
         else:
-            td = time.time() - t0
-            if td > 600:
-                logger.warn("It's been ten minutes! "
+            if old_finished != finished:
+                t0 = time.time()
+            elif time.time() - t0 > 300:
+                logger.warn("It's been five minutes with no progress! "
                             "Moving on with what we've got.")
                 send_message("Timeout", "Generation {0}".format(gen))
                 return
 
+        old_finished = finished
         time.sleep(5)
 
 
@@ -135,11 +138,11 @@ def main():
     sql_con, sql_cur = setup_db()
     conns = Connections(q, sql_con, sql_cur)
 
+    cohort_size = int(input("Enter cohort size: "))
     gen = int(input("Enter current generation (0 to start from scratch): "))
 
     if gen == 0:
         gen = 1
-        cohort_size = int(input("Enter initial cohort size: "))
         cohort = evolution.first_generation(cohort_size)
         queue_cohort(conns, gen, cohort)
 
@@ -153,6 +156,10 @@ def main():
                 "Generation Complete",
                 "Gen {0}, max score {1:.2f}".format(gen, highscore))
         new_cohort = evolution.new_generation(old_cohort)
+        members = len(new_cohort)
+        if members < cohort_size:
+            # timeout or fails
+            new_cohort += evolution.first_generation(cohort_size - members)
         gen += 1
         logger.info("Enqueueing tasks for generation %d...", gen)
         queue_cohort(conns, gen, new_cohort)
