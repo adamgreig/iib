@@ -1,6 +1,7 @@
 from iib.simulation import colour, genome, features, reduction, convolution
 from iib.simulation import CLContext
 
+import sys
 import os.path
 import numpy as np
 import pyopencl as cl
@@ -59,7 +60,13 @@ def dump_image(clctx, colours, ibuf_1a, ibuf_1b, s, iteration, prefix=None):
 
 
 def run_simulation(config):
-    ctx = cl.create_some_context(interactive=False)
+    if len(sys.argv) > 1:
+        platform_idx = int(sys.argv[1])
+        device_idx = int(sys.argv[2])
+        dev = cl.get_platforms()[platform_idx].get_devices()[device_idx]
+        ctx = cl.Context(devices=[dev])
+    else:
+        ctx = cl.create_some_context(interactive=False)
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     ifmt_f = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.FLOAT)
