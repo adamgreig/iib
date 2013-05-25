@@ -30,7 +30,7 @@ def mutate_del_gene(genome):
 
 def mutate_adddel_gene(genome):
     n = len(genome)//5
-    k = random.expovariate(1/3.0)
+    k = random.expovariate(1/4.0)
     if k > n:
         return mutate_add_gene(genome)
     else:
