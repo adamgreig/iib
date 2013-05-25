@@ -121,8 +121,8 @@ def wait_for_gen(conns, gen):
         else:
             if old_finished != finished:
                 t0 = time.time()
-            elif time.time() - t0 > 300:
-                logger.warn("It's been five minutes with no progress! "
+            elif time.time() - t0 > 60:
+                logger.warn("It's been a minute with no progress! "
                             "Moving on with what we've got.")
                 send_message("Timeout", "Generation {0}".format(gen))
                 return
