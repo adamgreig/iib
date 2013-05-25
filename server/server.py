@@ -77,8 +77,8 @@ def fetch_jobs_from_gen(conns, gen):
 
 
 def fetch_results_from_gen(conns, gen):
-    conns.sql_cur.execute("SELECT genome, score FROM iib WHERE generation = ?",
-                          (gen,))
+    conns.sql_cur.execute("SELECT genome, score FROM iib WHERE generation = ?"
+                          " AND score", (gen,))
     return conns.sql_cur.fetchall()
 
 
@@ -148,7 +148,7 @@ def main():
     while True:
         wait_for_gen(conns, gen)
         old_cohort = fetch_results_from_gen(conns, gen)
-        highscore = max(i[1] for i in old_cohort if i[1])
+        highscore = max(i[1] for i in old_cohort)
         logger.info("Generation complete. Max score: %.2f", highscore)
         if gen % 10 == 0:
             send_message(
