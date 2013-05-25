@@ -100,8 +100,8 @@ def run_simulation(config):
             dump_image(clctx, colours, ibuf_1a, ibuf_1b, i, iteration+1)
 
         if config.get('early_stop') and iteration > 1:
-            d = np.max(np.abs(feature_v[iteration] - feature_v[iteration - 1]))
-            if d < 0.001:
+            m = np.max(feature_v[iteration])
+            if m < 0.01:
                 break
 
     if config.get('dump_final_image'):
