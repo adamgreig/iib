@@ -148,7 +148,7 @@ def main():
     while True:
         wait_for_gen(conns, gen)
         old_cohort = fetch_results_from_gen(conns, gen)
-        highscore = max(i[1] for i in old_cohort)
+        highscore = max(i[1] for i in old_cohort if i[1])
         logger.info("Generation complete. Max score: %.2f", highscore)
         if gen % 10 == 0:
             send_message(
