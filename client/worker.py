@@ -7,7 +7,7 @@ import sys
 import iib.simulation
 import numpy
 
-host = None
+host = "localhost"
 if len(sys.argv) > 1:
     host = sys.argv[1]
 
