@@ -108,7 +108,7 @@ def run_simulation(config):
 
         if config.get('early_stop') and iteration > 1:
             m = np.max(feature_v[iteration])
-            if m < 0.01:
+            if m < 0.1:
                 break
 
     if config.get('dump_final_image'):
