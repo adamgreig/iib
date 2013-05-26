@@ -1,0 +1,8 @@
+#!/bin/bash
+cd /home/ec2-user/iib
+su ec2-user -c "git reset --hard master"
+su ec2-user -c "git fetch origin"
+su ec2-user -c "git merge origin/master"
+su ec2-user -c "screen -d -m /home/ec2-user/iib/venv/bin/python /home/ec2-user/iib/client/worker.py 10.12.135.67 0 0"
+su ec2-user -c "screen -d -m /home/ec2-user/iib/venv/bin/python /home/ec2-user/iib/client/worker.py 10.12.135.67 0 1"
+su ec2-user -c "screen -d -m /home/ec2-user/iib/venv/bin/python /home/ec2-user/iib/client/worker.py 10.12.135.67 1 0"
