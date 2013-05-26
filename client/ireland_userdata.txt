@@ -1,6 +1,7 @@
 #!/bin/bash
 
 cd /home/ec2-user/iib
+su ec2-user -c "git checkout master"
 su ec2-user -c "git reset --hard master"
 su ec2-user -c "git fetch origin"
 su ec2-user -c "git merge origin/master"
