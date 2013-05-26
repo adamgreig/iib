@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 from redis import Redis
 from rq import Connection, Queue, Worker
+import sys
 
 # Preload libraries
-import iib
+import iib.simulation
+import numpy
 
-with Connection(Redis(decode_responses=True)):
+host = None
+if len(sys.argv) > 1:
+    host = sys.argv[1]
+
+with Connection(Redis(host=host, decode_responses=True)):
     Worker([Queue()]).work()
