@@ -60,7 +60,7 @@ def dump_image(clctx, colours, ibuf_1a, ibuf_1b, s, iteration, prefix=None):
 
 
 def run_simulation(config):
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         platform_idx = int(sys.argv[2])
         device_idx = int(sys.argv[3])
         dev = cl.get_platforms()[platform_idx].get_devices()[device_idx]
