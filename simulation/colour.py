@@ -1,8 +1,12 @@
 import colorsys
 import numpy as np
 import pyopencl as cl
-from PIL import Image
 from string import Template
+
+try:
+    from PIL import Image
+except ImportError:
+    print("Could not import PIL for Image, skipping.")
 
 colour_cl_str = """//CL//
 __constant float colour_lut[768] = { $colourlut };
