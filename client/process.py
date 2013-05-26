@@ -11,8 +11,8 @@ def process(config):
     # ignore first two FVs due to initial conditions
     fvs = fvs[2:]
 
-    # now find maximum for each feature
-    fvs = np.max(fvs, axis=0)
+    # now find mean for each feature
+    fvs = np.mean(fvs, axis=0)
 
     # sum up all the blob counts
     blobs = np.sum(fvs[1:6], axis=0)
@@ -75,5 +75,5 @@ standard_config = {
 
 if __name__ == "__main__":
     cfg = copy.copy(standard_config)
-    cfg["genome"] = "+4303+4513-1242"
+    cfg["genome"] = "+1900-0940+1601"
     print(process(cfg))
